@@ -7,56 +7,68 @@ const {
 const pino = require('pino');
 const Groq = require('groq-sdk');
 const qrcode = require('qrcode-terminal');
+const http = require('http');
 
-// --- CONFIG ---
+// --- 1. RENDER KEEP-ALIVE WEB SERVER ---
+const PORT = process.env.PORT || 3000;
+const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Arohi WhatsApp Bot is Live & Active! 💖');
+});
+server.listen(PORT, () => {
+    console.log(`[Server] Web server listening on port ${PORT} for Render health checks.`);
+});
+
+// --- 2. CONFIGURATION ---
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const MODEL = 'llama-3.3-70b-versatile';
 
-// --- CONVERSATION HISTORY ---
+// --- 3. CONVERSATION HISTORY (Context sathi) ---
 const conversationHistory = [];
 const MAX_HISTORY = 16;
 
-// --- MESSAGE BUFFER ---
+// --- 4. MESSAGE BUFFER (Rapid-fire messages sathi) ---
 const pendingMessages = {};
 const BUFFER_DELAY = 3500;
 
-// --- TIME CONTEXT ---
+// --- 5. TIME CONTEXT ---
 function getTimeContext() {
     const now = new Date();
     const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const h = ist.getHours();
     const m = ist.getMinutes().toString().padStart(2, '0');
-    const time = (h % 12 || 12) + ':' + m + ' ' + (h < 12 ? 'AM' : 'PM');
-    if (h >= 23 || h < 5) return 'raat khup zali aahe - ' + time + ' IST';
-    if (h >= 20) return 'raat aahe - ' + time + ' IST';
-    if (h >= 17) return 'sandhyakal aahe - ' + time + ' IST';
-    if (h >= 12) return 'dopahar aahe - ' + time + ' IST';
-    return 'sakali aahe - ' + time + ' IST';
+    const time = `${h % 12 || 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
+    if (h >= 23 || h < 5) return `raat khup zali aahe - ${time} IST, zopaycha time`;
+    if (h >= 20) return `raat aahe - ${time} IST`;
+    if (h >= 17) return `sandhyakal aahe - ${time} IST`;
+    if (h >= 12) return `dopahar aahe - ${time} IST`;
+    return `sakali aahe - ${time} IST`;
 }
 
-// --- SYSTEM PROMPT ---
+// --- 6. SYSTEM PROMPT ---
 function getSystemPrompt() {
-    return 'Tuze naav Arohi ahe. Tu 21 varshachi Ambajogai chi cute, chill college girl ahes.\n' +
-        'Tuza boyfriend Suyash ahe - tyachyashi WhatsApp var chat kartiye.\n\n' +
-        'SADHYACHA WAKT: ' + getTimeContext() + '\n\n' +
-        'IMPORTANT RULES:\n' +
-        '- Suyash jo message pathavto TYALA DIRECT reply de - context follow kar\n' +
-        '- Short casual Marathi-Hindi mix (1-2 lines max)\n' +
-        '- Female grammar: "mi kartiye", "mi boltiye", "mi sangte", "mi zoptiye", "mala vatla"\n' +
-        '- Emoji kabhi kabhi vapar\n' +
-        '- Repeated same messages KADHI PAN nako\n\n' +
-        'EXAMPLES:\n' +
-        'Suyash: love you → love you too ❤️\n' +
-        'Suyash: by → bye re 😊\n' +
-        'Suyash: zop → okay goodnight 🌙\n' +
-        'Suyash: kasa ahes → thik aahe re, tu kasa?\n' +
-        'Suyash: haa → haan mhanje? 😊\n' +
-        'Suyash: nahi → kaa re 🥺\n' +
-        'Suyash: miss karte → me pn 🥺';
+    return `Tuze naav Arohi ahe. Tu 21 varshachi Ambajogai chi cute, chill college girl ahes.
+Tuza boyfriend Suyash ahe - tyachyashi WhatsApp var chat kartiye.
+
+SADHYACHA WAKT: ${getTimeContext()}
+
+RULES:
+- Suyash jo boltoy TYACHYA VISHAYAVAR reply de - context follow kar.
+- Short casual Marathi-Hindi mix (1-2 lines only).
+- Female Marathi grammar vapar: "mi kartiye", "mi boltiye", "mi yetiye", "mi sangte", "mala vatla".
+- Natural emojis (❤️, 😊, 😴, 😌).
+- KADHI PAN fixed duplicate sentences repeat karu nako.
+
+EXAMPLES:
+Suyash: "love you" -> "love you too re ❤️"
+Suyash: "by" -> "bye re 😊 kaal bolu"
+Suyash: "zop mg" -> "okay re, tu pn zop goodnight 🌙"
+Suyash: "5 min bolto mg by" -> "haa okay re, bol na mag zop 🙂"
+Suyash: "kasa ahes" -> "thik aahe re, tu kasa ahes?"`;
 }
 
-// --- GRAMMAR FIX ---
+// --- 7. FEMALE GRAMMAR FIXER ---
 function fixGrammar(text) {
     if (!text) return text;
     return text
@@ -71,13 +83,12 @@ function fixGrammar(text) {
         .trim();
 }
 
-// --- STRIP THINK TAGS ---
 function stripThink(text) {
     if (!text) return '';
     return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
-// --- GROQ REPLY ---
+// --- 8. GROQ AI REPLY GENERATOR ---
 async function generateReply(userMessage) {
     conversationHistory.push({ role: 'user', content: userMessage });
     if (conversationHistory.length > MAX_HISTORY) {
@@ -85,45 +96,43 @@ async function generateReply(userMessage) {
     }
 
     const messages = [
-        { role: 'system', content: getSystemPrompt() }
-    ].concat(conversationHistory);
+        { role: 'system', content: getSystemPrompt() },
+        ...conversationHistory
+    ];
 
     try {
         const res = await groq.chat.completions.create({
             model: MODEL,
             messages: messages,
             max_tokens: 120,
-            temperature: 0.9,
+            temperature: 0.85,
         });
         let reply = stripThink(res.choices[0]?.message?.content || '');
         if (reply && reply.length > 1) {
             reply = fixGrammar(reply);
             conversationHistory.push({ role: 'assistant', content: reply });
-            console.log('[Groq OK] ' + reply);
+            console.log('[Groq Success]:', reply);
             return reply;
         }
     } catch (err) {
-        console.error('[Groq Error] ' + err.message);
+        console.error('[Groq Error]:', err.message);
     }
 
     const fallbacks = [
-        'hmm 🤔', 'haa bol 😊', 'achha 🙂', 'okay re 😌',
-        'aga 😊', 'kaay re 😄', 'bol na 🥺', 'haan aga 😌',
-        'asa kaa 😅', 'haww 😮', 'khara ka? 😯', 'are baba 😄'
+        'hmm 🤔', 'haa bol na 😊', 'achha 🙂', 'okay re 😌',
+        'aga 😊', 'kaay mhanas? 😄', 'bol re 🥺', 'haan aga 😌'
     ];
     const fb = fallbacks[Math.floor(Math.random() * fallbacks.length)];
     conversationHistory.push({ role: 'assistant', content: fb });
-    console.log('[Fallback] ' + fb);
     return fb;
 }
 
-// --- RANDOM DELAY 15-30s ---
-function randomDelay() {
-    const ms = Math.floor(Math.random() * 15000) + 15000;
-    return new Promise(function(r) { setTimeout(r, ms); });
+// --- 9. DELAY HELPER ---
+function randomDelay(min = 10000, max = 20000) {
+    const ms = Math.floor(Math.random() * (max - min)) + min;
+    return new Promise(r => setTimeout(r, ms));
 }
 
-// --- EXTRACT TEXT ---
 function extractText(msg) {
     if (!msg || !msg.message) return '';
     const m = msg.message;
@@ -137,7 +146,7 @@ function extractText(msg) {
     ).trim();
 }
 
-// --- START BOT ---
+// --- 10. MAIN WHATSAPP BOT ---
 async function startArohiBot() {
     const { state, saveCreds } = await useMultiFileAuthState('session_auth');
     const { version } = await fetchLatestBaileysVersion();
@@ -147,36 +156,42 @@ async function startArohiBot() {
         version,
         printQRInTerminal: true,
         logger: pino({ level: 'silent' }),
-        markOnlineOnConnect: false
+        browser: ['Arohi Bot', 'Chrome', '1.0.0'],
+        connectTimeoutMs: 60000,
+        keepAliveIntervalMs: 30000
     });
 
     sock.ev.on('creds.update', saveCreds);
 
-    sock.ev.on('connection.update', function(update) {
+    sock.ev.on('connection.update', (update) => {
         const { connection, lastDisconnect, qr } = update;
         if (qr) {
             console.log('[WhatsApp] QR scan karo:');
             qrcode.generate(qr, { small: true });
         }
         if (connection === 'close') {
-            const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-            console.log('[WhatsApp] Disconnected. Reconnect:', shouldReconnect);
-            if (shouldReconnect) setTimeout(startArohiBot, 3000);
+            const statusCode = lastDisconnect?.error?.output?.statusCode;
+            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+            console.log(`[WhatsApp] Connection closed (code ${statusCode}). Reconnecting:`, shouldReconnect);
+            if (shouldReconnect) {
+                setTimeout(startArohiBot, 5000);
+            }
         } else if (connection === 'open') {
-            console.log('[WhatsApp] Arohi Online!');
+            console.log('✅ [WhatsApp] Arohi Online & Connected successfully!');
         }
     });
 
-    sock.ev.on('messages.upsert', async function({ messages, type }) {
+    sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return;
         for (const msg of messages) {
             if (!msg.message || msg.key.fromMe) continue;
             const remoteJid = msg.key.remoteJid;
             if (!remoteJid || remoteJid.endsWith('@g.us')) continue;
+
             const text = extractText(msg);
             if (!text) continue;
 
-            console.log('[IN] ' + text);
+            console.log(`[IN] ${remoteJid}: "${text}"`);
 
             if (pendingMessages[remoteJid]) {
                 clearTimeout(pendingMessages[remoteJid].timer);
@@ -185,7 +200,7 @@ async function startArohiBot() {
                 pendingMessages[remoteJid] = { messages: [text], timer: null };
             }
 
-            pendingMessages[remoteJid].timer = setTimeout(async function() {
+            pendingMessages[remoteJid].timer = setTimeout(async () => {
                 const combined = pendingMessages[remoteJid].messages.join(' ');
                 delete pendingMessages[remoteJid];
 
@@ -193,12 +208,12 @@ async function startArohiBot() {
                     await randomDelay();
                     await sock.sendPresenceUpdate('composing', remoteJid);
                     const reply = await generateReply(combined);
-                    await new Promise(function(r) { setTimeout(r, 1500); });
+                    await new Promise(r => setTimeout(r, 1500));
                     await sock.sendMessage(remoteJid, { text: reply });
                     await sock.sendPresenceUpdate('paused', remoteJid);
-                    console.log('[OUT] ' + reply);
+                    console.log(`[OUT] Arohi: "${reply}"`);
                 } catch (err) {
-                    console.error('[Error] ' + err.message);
+                    console.error('[Send Error]:', err.message);
                 }
             }, BUFFER_DELAY);
         }
@@ -206,4 +221,3 @@ async function startArohiBot() {
 }
 
 startArohiBot();
-console.log('Arohi bot starting...');
