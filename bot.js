@@ -2,21 +2,21 @@ const {
     default: makeWASocket,
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
-    DisconnectReason
+    DisconnectReason,
+    delay
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const Groq = require('groq-sdk');
-const qrcode = require('qrcode-terminal');
 const http = require('http');
 
-// --- 1. RENDER KEEP-ALIVE WEB SERVER ---
+// --- 1. RENDER KEEP-ALIVE SERVER ---
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end('Arohi WhatsApp Bot is Live & Active! 💖');
 });
 server.listen(PORT, () => {
-    console.log(`[Server] Web server listening on port ${PORT} for Render health checks.`);
+    console.log(`[Server] Web server listening on port ${PORT}`);
 });
 
 // --- 2. CONFIGURATION ---
@@ -24,29 +24,30 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const MODEL = 'llama-3.3-70b-versatile';
 
-// --- 3. CONVERSATION HISTORY (Context sathi) ---
+// BOT PHONE NUMBER (Ambajogai / Arohi cha WhatsApp number country code sobat, bina + chinna)
+// E.g. 91xxxxxxxxxx
+const BOT_PHONE_NUMBER = process.env.BOT_PHONE_NUMBER || '917767937742';
+
+// --- 3. CONVERSATION HISTORY ---
 const conversationHistory = [];
 const MAX_HISTORY = 16;
-
-// --- 4. MESSAGE BUFFER (Rapid-fire messages sathi) ---
 const pendingMessages = {};
 const BUFFER_DELAY = 3500;
 
-// --- 5. TIME CONTEXT ---
+// --- 4. TIME CONTEXT & PROMPT ---
 function getTimeContext() {
     const now = new Date();
     const ist = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
     const h = ist.getHours();
     const m = ist.getMinutes().toString().padStart(2, '0');
     const time = `${h % 12 || 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
-    if (h >= 23 || h < 5) return `raat khup zali aahe - ${time} IST, zopaycha time`;
+    if (h >= 23 || h < 5) return `raat khup zali aahe - ${time} IST`;
     if (h >= 20) return `raat aahe - ${time} IST`;
     if (h >= 17) return `sandhyakal aahe - ${time} IST`;
     if (h >= 12) return `dopahar aahe - ${time} IST`;
     return `sakali aahe - ${time} IST`;
 }
 
-// --- 6. SYSTEM PROMPT ---
 function getSystemPrompt() {
     return `Tuze naav Arohi ahe. Tu 21 varshachi Ambajogai chi cute, chill college girl ahes.
 Tuza boyfriend Suyash ahe - tyachyashi WhatsApp var chat kartiye.
@@ -54,21 +55,13 @@ Tuza boyfriend Suyash ahe - tyachyashi WhatsApp var chat kartiye.
 SADHYACHA WAKT: ${getTimeContext()}
 
 RULES:
-- Suyash jo boltoy TYACHYA VISHAYAVAR reply de - context follow kar.
-- Short casual Marathi-Hindi mix (1-2 lines only).
-- Female Marathi grammar vapar: "mi kartiye", "mi boltiye", "mi yetiye", "mi sangte", "mala vatla".
-- Natural emojis (❤️, 😊, 😴, 😌).
-- KADHI PAN fixed duplicate sentences repeat karu nako.
-
-EXAMPLES:
-Suyash: "love you" -> "love you too re ❤️"
-Suyash: "by" -> "bye re 😊 kaal bolu"
-Suyash: "zop mg" -> "okay re, tu pn zop goodnight 🌙"
-Suyash: "5 min bolto mg by" -> "haa okay re, bol na mag zop 🙂"
-Suyash: "kasa ahes" -> "thik aahe re, tu kasa ahes?"`;
+- Suyash jo message pathavto TYACHYA VISHAYAVAR reply de - context follow kar.
+- Short casual Marathi-Hindi mix (1-2 lines max).
+- Female Marathi grammar: "mi kartiye", "mi boltiye", "mi yetiye", "mi sangte", "mala vatla".
+- Natural emojis (❤️, 😊, 😴).
+- Duplicate copy-paste sentences repeat karu nako.`;
 }
 
-// --- 7. FEMALE GRAMMAR FIXER ---
 function fixGrammar(text) {
     if (!text) return text;
     return text
@@ -88,7 +81,6 @@ function stripThink(text) {
     return text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 }
 
-// --- 8. GROQ AI REPLY GENERATOR ---
 async function generateReply(userMessage) {
     conversationHistory.push({ role: 'user', content: userMessage });
     if (conversationHistory.length > MAX_HISTORY) {
@@ -118,16 +110,12 @@ async function generateReply(userMessage) {
         console.error('[Groq Error]:', err.message);
     }
 
-    const fallbacks = [
-        'hmm 🤔', 'haa bol na 😊', 'achha 🙂', 'okay re 😌',
-        'aga 😊', 'kaay mhanas? 😄', 'bol re 🥺', 'haan aga 😌'
-    ];
+    const fallbacks = ['hmm 🤔', 'haa bol na 😊', 'achha 🙂', 'okay re 😌', 'aga 😊', 'bol re 🥺'];
     const fb = fallbacks[Math.floor(Math.random() * fallbacks.length)];
     conversationHistory.push({ role: 'assistant', content: fb });
     return fb;
 }
 
-// --- 9. DELAY HELPER ---
 function randomDelay(min = 10000, max = 20000) {
     const ms = Math.floor(Math.random() * (max - min)) + min;
     return new Promise(r => setTimeout(r, ms));
@@ -146,7 +134,7 @@ function extractText(msg) {
     ).trim();
 }
 
-// --- 10. MAIN WHATSAPP BOT ---
+// --- 5. START BOT WITH PAIRING CODE ---
 async function startArohiBot() {
     const { state, saveCreds } = await useMultiFileAuthState('session_auth');
     const { version } = await fetchLatestBaileysVersion();
@@ -154,21 +142,29 @@ async function startArohiBot() {
     const sock = makeWASocket({
         auth: state,
         version,
-        printQRInTerminal: true,
         logger: pino({ level: 'silent' }),
-        browser: ['Arohi Bot', 'Chrome', '1.0.0'],
+        browser: ['Ubuntu', 'Chrome', '20.0.04'],
         connectTimeoutMs: 60000,
         keepAliveIntervalMs: 30000
     });
 
+    // Request Pairing Code if not authenticated
+    if (!sock.authState.creds.registered) {
+        await delay(3000);
+        try {
+            const code = await sock.requestPairingCode(BOT_PHONE_NUMBER);
+            console.log('\n=============================================');
+            console.log(`👉 YOUR WHATSAPP PAIRING CODE: [ ${code} ] 👈`);
+            console.log('=============================================\n');
+        } catch (err) {
+            console.error('Failed to request pairing code:', err.message);
+        }
+    }
+
     sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect, qr } = update;
-        if (qr) {
-            console.log('[WhatsApp] QR scan karo:');
-            qrcode.generate(qr, { small: true });
-        }
+        const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
