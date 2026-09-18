@@ -3,7 +3,7 @@ const {
     useMultiFileAuthState,
     fetchLatestBaileysVersion,
     DisconnectReason,
-    delay
+    Browsers
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const Groq = require('groq-sdk');
@@ -13,7 +13,7 @@ const http = require('http');
 const PORT = process.env.PORT || 3000;
 const server = http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
-    res.end('Arohi WhatsApp Bot is Live & Active! 💖');
+    res.end('Arohi Bot is Live & Active! 💖');
 });
 server.listen(PORT, () => {
     console.log(`[Server] Web server listening on port ${PORT}`);
@@ -24,11 +24,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 const MODEL = 'llama-3.3-70b-versatile';
 
-// BOT PHONE NUMBER (Ambajogai / Arohi cha WhatsApp number country code sobat, bina + chinna)
-// E.g. 91xxxxxxxxxx
-const BOT_PHONE_NUMBER = process.env.BOT_PHONE_NUMBER || '917767937742';
-
-// --- 3. CONVERSATION HISTORY ---
+// --- 3. CONVERSATION HISTORY & BUFFER ---
 const conversationHistory = [];
 const MAX_HISTORY = 16;
 const pendingMessages = {};
@@ -41,7 +37,7 @@ function getTimeContext() {
     const h = ist.getHours();
     const m = ist.getMinutes().toString().padStart(2, '0');
     const time = `${h % 12 || 12}:${m} ${h < 12 ? 'AM' : 'PM'}`;
-    if (h >= 23 || h < 5) return `raat khup zali aahe - ${time} IST`;
+    if (h >= 23 || h < 5) return `raat khup zali aahe - ${time} IST, sleepy time`;
     if (h >= 20) return `raat aahe - ${time} IST`;
     if (h >= 17) return `sandhyakal aahe - ${time} IST`;
     if (h >= 12) return `dopahar aahe - ${time} IST`;
@@ -56,10 +52,16 @@ SADHYACHA WAKT: ${getTimeContext()}
 
 RULES:
 - Suyash jo message pathavto TYACHYA VISHAYAVAR reply de - context follow kar.
-- Short casual Marathi-Hindi mix (1-2 lines max).
+- Short casual Marathi-Hindi mix (1-2 lines only).
 - Female Marathi grammar: "mi kartiye", "mi boltiye", "mi yetiye", "mi sangte", "mala vatla".
-- Natural emojis (❤️, 😊, 😴).
-- Duplicate copy-paste sentences repeat karu nako.`;
+- Natural emojis (❤️, 😊, 😴, 😌).
+- Duplicates copy-paste repeat karu nako.
+
+EXAMPLES:
+Suyash: "love you" -> "love you too ❤️"
+Suyash: "by" -> "bye re 😊 kaal bolu"
+Suyash: "zop mg" -> "okay goodnight re 🌙"
+Suyash: "kasa ahes" -> "thik aahe re, tu kasa ahes?"`;
 }
 
 function fixGrammar(text) {
@@ -110,13 +112,13 @@ async function generateReply(userMessage) {
         console.error('[Groq Error]:', err.message);
     }
 
-    const fallbacks = ['hmm 🤔', 'haa bol na 😊', 'achha 🙂', 'okay re 😌', 'aga 😊', 'bol re 🥺'];
+    const fallbacks = ['hmm 🤔', 'haa bol na 😊', 'achha 🙂', 'okay re 😌', 'aga 😊', 'bol na 🥺'];
     const fb = fallbacks[Math.floor(Math.random() * fallbacks.length)];
     conversationHistory.push({ role: 'assistant', content: fb });
     return fb;
 }
 
-function randomDelay(min = 10000, max = 20000) {
+function randomDelay(min = 8000, max = 16000) {
     const ms = Math.floor(Math.random() * (max - min)) + min;
     return new Promise(r => setTimeout(r, ms));
 }
@@ -134,32 +136,23 @@ function extractText(msg) {
     ).trim();
 }
 
-// --- 5. START BOT WITH PAIRING CODE ---
+// --- 5. STABLE BAILEYS CONNECTION ---
+let sock = null;
+
 async function startArohiBot() {
     const { state, saveCreds } = await useMultiFileAuthState('session_auth');
     const { version } = await fetchLatestBaileysVersion();
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
         auth: state,
         version,
         logger: pino({ level: 'silent' }),
-        browser: ['Ubuntu', 'Chrome', '20.0.04'],
+        browser: Browsers.macOS('Desktop'),
+        syncFullHistory: false,
+        markOnlineOnConnect: true,
         connectTimeoutMs: 60000,
-        keepAliveIntervalMs: 30000
+        defaultQueryTimeoutMs: 60000
     });
-
-    // Request Pairing Code if not authenticated
-    if (!sock.authState.creds.registered) {
-        await delay(3000);
-        try {
-            const code = await sock.requestPairingCode(BOT_PHONE_NUMBER);
-            console.log('\n=============================================');
-            console.log(`👉 YOUR WHATSAPP PAIRING CODE: [ ${code} ] 👈`);
-            console.log('=============================================\n');
-        } catch (err) {
-            console.error('Failed to request pairing code:', err.message);
-        }
-    }
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -167,10 +160,10 @@ async function startArohiBot() {
         const { connection, lastDisconnect } = update;
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-            console.log(`[WhatsApp] Connection closed (code ${statusCode}). Reconnecting:`, shouldReconnect);
-            if (shouldReconnect) {
-                setTimeout(startArohiBot, 5000);
+            const isLoggedOut = statusCode === DisconnectReason.loggedOut;
+            console.log(`[WhatsApp] Connection closed (code ${statusCode}). Reconnecting: ${!isLoggedOut}`);
+            if (!isLoggedOut) {
+                setTimeout(startArohiBot, 8000);
             }
         } else if (connection === 'open') {
             console.log('✅ [WhatsApp] Arohi Online & Connected successfully!');
