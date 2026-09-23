@@ -13,12 +13,17 @@ const url = require('url');
 const QRCode = require('qrcode');
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
-const RENDER_URL   = 'https://arohi-bot.onrender.com';
+// API key ONLY from Render Environment variable (never write it in code)
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const RENDER_URL   = 'https://arohi-bot-wckx.onrender.com';
 const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
+
+if (!GROQ_API_KEY) {
+  console.error('[Config] GROQ_API_KEY missing! Add it in Render > Environment.');
+}
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
@@ -32,24 +37,24 @@ http.createServer(async (req, res) => {
   if (parsed.pathname === '/qr') {
     const key = parsed.query.key;
     if (key !== QR_TOKEN) {
-      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
       return res.end('Forbidden');
     }
     if (connectionStatus === 'connected') {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       return res.end('<h2 style="font-family:sans-serif;color:green">✅ WhatsApp Connected! Bot is live.</h2>');
     }
     if (!latestQR) {
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end('<html><head><meta http-equiv="refresh" content="3"></head><body style="font-family:sans-serif;background:#111;color:#fff"><h2>Generating QR code... (auto-refresh in 3s)</h2></body></html>');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<html><head><meta charset="utf-8"><meta http-equiv="refresh" content="3"></head><body style="font-family:sans-serif;background:#111;color:#fff"><h2>Generating QR code... (auto-refresh in 3s)</h2></body></html>');
       return;
     }
     try {
       const qrImage = await QRCode.toDataURL(latestQR, { width: 320, margin: 2 });
-      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`
         <html>
-        <head><meta http-equiv="refresh" content="20"></head>
+        <head><meta charset="utf-8"><meta http-equiv="refresh" content="20"></head>
         <body style="font-family:sans-serif;background:#111;color:#fff;text-align:center;padding-top:40px">
           <h2>${GIRL_NAME} Bot — Scan to Connect WhatsApp</h2>
           <img src="${qrImage}" style="background:#fff;padding:16px;border-radius:8px" />
@@ -58,13 +63,13 @@ http.createServer(async (req, res) => {
         </html>
       `);
     } catch (e) {
-      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('Error generating QR: ' + e.message);
     }
     return;
   }
 
-  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Arohi bot alive ✅ status: ' + connectionStatus);
 }).listen(PORT, () => console.log('[Server] Running on port ' + PORT));
 
@@ -212,7 +217,9 @@ function fixReply(text) {
 }
 
 // ─── AI REPLY (TEXT ONLY) ─────────────────────────────────────────────────────
-const GROQ_MODEL = 'llama-3.3-70b-versatile'; // decommissioned llama3-8b-8192 ऐवजी
+// gpt-oss is a reasoning model: reasoning tokens count inside max_completion_tokens,
+// so keep the limit high (1000) and reasoning_effort low.
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
@@ -221,7 +228,8 @@ async function getAIReply(jid, userMsg) {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(history),
-      max_tokens: 100,
+      max_completion_tokens: 1000,
+      reasoning_effort: 'low',
       temperature: 0.92,
     });
     let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
@@ -234,7 +242,7 @@ async function getAIReply(jid, userMsg) {
   }
 }
 
-// ─── PROACTIVE MESSAGING (ती स्वतःहून दर 1-2 तासांनी मेसेज करेल) ────────────
+// ─── PROACTIVE MESSAGING (she texts first every 1-2 hours) ───────────────────
 let lastActiveJid = null;
 let proactiveTimer = null;
 
@@ -251,7 +259,8 @@ async function getProactiveStarterMessage(jid) {
       messages: [{ role: 'system', content: getSystemPrompt() }]
         .concat(history.slice(-6))
         .concat([{ role: 'user', content: starterPrompt }]),
-      max_tokens: 80,
+      max_completion_tokens: 1000,
+      reasoning_effort: 'low',
       temperature: 0.95,
     });
     let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
