@@ -15,21 +15,21 @@ const QRCode = require('qrcode');
 const url = require('url');
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
+// 👇👇 Tuzi Navin Groq Key 👇👇
+const GROQ_API_KEY = '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';
 const RENDER_URL   = 'https://arohi-bot.onrender.com';
 const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 
-// 👇👇👇 ELEVENLABS CONFIG 👇👇👇
+// 👇👇 ElevenLabs Config 👇👇
 const ELEVENLABS_API_KEY = 'sk_a619de968a54a2ac7208654ab983ec2daffe836ff093cb7e'; 
 const ELEVENLABS_VOICE_ID = 'dVTC43Yewy5fAIcmsISI';            
-// 👆👆👆 ──────────────────── 👆👆👆
+// 👆👆 ──────────────────── 👆👆
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
-// ─── QR CODE STATE ────────────────────────────────────────────────────────────
 let latestQR = null;       
 let connectionStatus = 'starting'; 
 
@@ -130,7 +130,7 @@ async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
   try {
     const res = await groq.chat.completions.create({
-      model: 'llama-3.1-70b-versatile',
+      model: 'llama3-8b-8192', // Ekdam fast ani stable model
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_tokens: 100,
       temperature: 0.9,
@@ -168,7 +168,12 @@ async function generateElevenLabsAudio(text) {
     };
 
     const req = https.request(options, (res) => {
-      if (res.statusCode !== 200) return reject(new Error('ElevenLabs Error: ' + res.statusCode));
+      if (res.statusCode !== 200) {
+        let errData = '';
+        res.on('data', d => errData += d);
+        res.on('end', () => reject(new Error('ElevenLabs Error ' + res.statusCode + ': ' + errData)));
+        return;
+      }
       const filepath = path.join(__dirname, 'temp_voice_' + Date.now() + '.mp3');
       const file = fs.createWriteStream(filepath);
       res.pipe(file);
