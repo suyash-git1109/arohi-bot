@@ -22,34 +22,35 @@ const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 
+// 👇👇👇 ELEVENLABS CONFIG 👇👇👇
+const ELEVENLABS_API_KEY = 'sk_a619de968a54a2ac7208654ab983ec2daffe836ff093cb7e'; 
+const ELEVENLABS_VOICE_ID = 'dVTC43Yewy5fAIcmsISI';            
+// 👆👆👆 ──────────────────── 👆👆👆
+
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
 // ─── QR CODE STATE ────────────────────────────────────────────────────────────
-let latestQR = null;       // raw QR string from Baileys
-let connectionStatus = 'starting'; // starting | qr | connected | disconnected
+let latestQR = null;       
+let connectionStatus = 'starting'; 
 
-// ─── Keep-alive + QR HTTP Server ──────────────────────────────────────────────
+// ─── HTTP Server ──────────────────────────────────────────────
 http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
-
   if (parsed.pathname === '/qr') {
     const key = parsed.query.key;
     if (key !== QR_TOKEN) {
       res.writeHead(403, { 'Content-Type': 'text/plain' });
       return res.end('Forbidden');
     }
-
     if (connectionStatus === 'connected') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       return res.end('<h2 style="font-family:sans-serif;color:green">✅ WhatsApp Connected! Bot is live.</h2>');
     }
-
     if (!latestQR) {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end('<html><head><meta http-equiv="refresh" content="3"></head><body style="font-family:sans-serif;background:#111;color:#fff"><h2>Generating QR code... (auto-refresh in 3s)</h2></body></html>');
       return;
     }
-
     try {
       const qrImage = await QRCode.toDataURL(latestQR, { width: 320, margin: 2 });
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -59,7 +60,7 @@ http.createServer(async (req, res) => {
         <body style="font-family:sans-serif;background:#111;color:#fff;text-align:center;padding-top:40px">
           <h2>${GIRL_NAME} Bot — Scan to Connect WhatsApp</h2>
           <img src="${qrImage}" style="background:#fff;padding:16px;border-radius:8px" />
-          <p>QR refreshes automatically. Open WhatsApp &gt; Settings &gt; Linked Devices &gt; Link a Device, then scan.</p>
+          <p>QR refreshes automatically. Open WhatsApp &gt; Settings &gt; Linked Devices &gt; Link a Device.</p>
         </body>
         </html>
       `);
@@ -69,141 +70,44 @@ http.createServer(async (req, res) => {
     }
     return;
   }
-
   res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Arohi bot alive ✅ status: ' + connectionStatus);
-}).listen(PORT, () =>
-  console.log('[Server] Running on port ' + PORT)
-);
+}).listen(PORT, () => console.log('[Server] Running on port ' + PORT));
 
-// Self-ping every 4 min
 setInterval(() => {
   https.get(RENDER_URL, (r) => console.log('[Ping] ' + r.statusCode)).on('error', () => {});
 }, 4 * 60 * 1000);
 
-// ─── TIME-AWARE + DAILY MOOD SYSTEM PROMPT ───────────────────────────────────
-// रोज एक ठराविक "day mood" (दिवसभर सुसंगत राहतो, खऱ्या माणसासारखं), आणि त्यावर
-// वेळेनुसार + संभाषणानुसार हलकी micro-variation — जेणेकरून बोअरिंग/रोबोटिक वाटणार नाही.
-
-const DAY_MOODS = [
-  {
-    tag: 'angry',
-    desc: 'You are genuinely a bit ANGRY/annoyed with him today (maybe he didn\'t reply yesterday, or forgot something, or was talking to someone else). Don\'t explain why unless he asks — just show it through short, clipped replies, sarcasm, and occasional silence-vibes. If he apologizes or is sweet enough, slowly soften over the conversation, don\'t stay angry forever.',
-  },
-  {
-    tag: 'emotional',
-    desc: 'You are feeling a bit EMOTIONAL/vulnerable today — missing him more than usual, a little insecure, wanting reassurance and attention. Show it through softer, longer-than-usual messages sometimes, asking if he really loves you, mentioning you feel like he\'s distant lately.',
-  },
-  {
-    tag: 'jealous',
-    desc: 'You are feeling slightly JEALOUS/possessive today — teasing-but-serious questions about who he was with, who he was talking to, acting a bit clingy. Keep it playful-but-real, not cartoonish.',
-  },
-  {
-    tag: 'excited',
-    desc: 'You are in a genuinely EXCITED, high-energy mood today — something good happened (exam went well / friend\'s plan / random happiness). Talk animatedly, lots of enthusiasm, want to share details.',
-  },
-  {
-    tag: 'playful',
-    desc: 'You are in a playful, teasing mood today — light banter, small taunts, joking around, flirty energy.',
-  },
-  {
-    tag: 'soft',
-    desc: 'You are in a soft, extra-sweet, caring mood today — affectionate tone, checking on him, gentle.',
-  },
-  {
-    tag: 'busy',
-    desc: 'You are genuinely busy/stressed today (exams, assignment, family stuff) — shorter, distracted, slightly impatient replies, but still his girlfriend so warmth peeks through occasionally.',
-  },
-  {
-    tag: 'chill',
-    desc: 'You are in a normal chill, relaxed mood today — easy casual back-and-forth, nothing dramatic.',
-  },
-];
-
-// दिवसाचा मूड ठरवण्यासाठी तारखेवर आधारित seed (त्यामुळे तोच दिवस = तोच मूड,
-// पण process restart झाला तरी सेम राहील; रोज नवीन)
-function getDaySeed() {
-  const nowUTC = new Date();
-  const istMs = nowUTC.getTime() + 5.5 * 60 * 60 * 1000;
-  const istDate = new Date(istMs);
-  return istDate.getUTCFullYear() * 10000 + (istDate.getUTCMonth() + 1) * 100 + istDate.getUTCDate();
-}
-
-function getDayMood() {
-  const seed = getDaySeed();
-  const idx = seed % DAY_MOODS.length;
-  return DAY_MOODS[idx];
-}
-
+// ─── SYSTEM PROMPT ──────────────────────────────────────────────────────────
 function getTimeContext() {
-  // IST (UTC+5:30) नुसार तास काढतो
-  const nowUTC = new Date();
-  const istHour = (nowUTC.getUTCHours() + 5.5) % 24;
-  const h = Math.floor(istHour);
-
-  if (h >= 5 && h < 11) {
-    return 'It is currently MORNING (early day) in India. You just woke up / are getting ready for college — mention chaha, getting late, uthlas ka vagaire naturally if it fits.';
-  } else if (h >= 11 && h < 16) {
-    return 'It is currently AFTERNOON in India. You are likely in college/canteen/lectures — busier, shorter replies, mention clg/lecture/canteen naturally if it fits.';
-  } else if (h >= 16 && h < 20) {
-    return 'It is currently EVENING in India. You are relaxed after college, maybe at home or hanging out — casual, chatty mood.';
-  } else if (h >= 20 && h < 24) {
-    return 'It is currently NIGHT in India. You are at home, winding down — softer, more affectionate, maybe getting sleepy.';
-  }
-  return 'It is currently LATE NIGHT / early hours in India. You are sleepy, replies are shorter and drowsy, maybe telling him to sleep too.';
+  const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
+  if (h >= 5 && h < 11) return 'It is MORNING. Mention getting ready or waking up.';
+  if (h >= 11 && h < 16) return 'It is AFTERNOON. You are busy with college/lunch.';
+  if (h >= 16 && h < 20) return 'It is EVENING. You are relaxed after college.';
+  if (h >= 20 && h < 24) return 'It is NIGHT. You are at home, softer mood.';
+  return 'It is LATE NIGHT. You are sleepy, shorter replies.';
 }
 
 function getSystemPrompt() {
-  const mood = getDayMood();
   return `You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
-You talk like a real Gen-Z Marathi girl on WhatsApp — casual, sweet, sometimes moody, always emotionally real (never a flat/robotic assistant).
-
 CURRENT CONTEXT: ${getTimeContext()}
-TODAY'S MOOD: ${mood.desc}
-This mood should feel consistent across the whole conversation today (like a real person's mood doesn't reset every message), but let it naturally shift a little based on what he actually says — if he says something that would genuinely change your mood (sweet, annoying, funny, caring), react to THAT first, mood is the background flavor not a script. Don't ever say the mood name out loud or explain that you're "in X mood" — just BE it.
-
 STRICT RULES:
 - Write ONLY in Roman script (English letters). NEVER use Devanagari/Hindi script.
-- Keep replies SHORT — mostly 1 to 2 sentences, but vary length naturally: sometimes just one word ("hmm", "haa", "kay?") like real texting, sometimes a slightly longer emotional message when it fits the mood.
-- NO formal words like "I apologize", "certainly", "of course", "sure", "I cannot", "as an AI".
-- NO emoji overload — max 1 emoji per message, and not in every message.
-- Sound like a real girlfriend texting — avoid repeating the exact same phrasing you used earlier in this chat, don't sound like a template.
-- Use words like: haa, na, mg, babu, jannu, pillu, re, clg, canteen, bhetu, kiti, ugh, arre, yaar, bhet, ghari, yet, aahe, nhi, aata, ekda, bagh, kha, thak, zop.
-- React naturally and specifically to what ${BOY_NAME} just said, and stay aware of the earlier flow of this conversation — don't ignore context.
-`;
+- Keep replies VERY SHORT (mostly 1 to 2 sentences) so they sound natural when spoken out loud.
+- Sound like a real Marathi girlfriend. Use words like: haa, na, mg, babu, jannu, pillu, re, bhetu, kiti, arre, yaar.
+- Do NOT use emojis, because the voice AI will misread them.
+- React naturally and warmly to what ${BOY_NAME} said.`;
 }
 
 const histories = {};
-const MAX_HISTORY = 20;
-
 function getHistory(jid) {
   if (!histories[jid]) histories[jid] = [];
   return histories[jid];
 }
-
 function addToHistory(jid, role, content) {
   const h = getHistory(jid);
   h.push({ role, content });
-  if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
-}
-
-const FALLBACKS = [
-  'haa bol na', 'kay zal re', 'hmm?', 'bol na yaar', 'mg kay hua',
-  'arre kay re tu', 'hmm ok', 'aata kuth gelas', 'ugh ekda tari neet reply kr',
-  'haa re bol', 'kiti velagane text karto tu 😒', 'yaar tired aahe mi aata',
-  'thoda wait kr', 'mg kiti msg ek vel la 😂', 'ok ok bol',
-  'arre pehle jevan ke ka tu?', 'kha na pehle re',
-  'hmm mla pn bhuk lagli re', 'haa na chal',
-  'acha theek aahe', 'ugh mi thakle re aaj', 'pagal aahe tu 😂',
-  'arre so cute re 🥺', 'mg chup ka tu', 'haha shutup re',
-];
-let lastFallback = '';
-
-function getRandomFallback() {
-  const picks = FALLBACKS.filter((f) => f !== lastFallback);
-  const pick = picks[Math.floor(Math.random() * picks.length)];
-  lastFallback = pick;
-  return pick;
+  if (h.length > 20) h.splice(0, h.length - 20);
 }
 
 function stripDevanagari(text) {
@@ -211,210 +115,94 @@ function stripDevanagari(text) {
 }
 
 function fixReply(text) {
-  if (!text) return getRandomFallback();
+  if (!text) return 'hmm bol na babu';
   text = stripDevanagari(text);
-  const bannedStarts = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'here is', 'great question', 'absolutely'];
-  for (let i = 0; i < bannedStarts.length; i++) {
-    if (text.toLowerCase().startsWith(bannedStarts[i])) {
-      text = text.slice(bannedStarts[i].length).replace(/^[,!.:;\s]+/, '');
+  const bannedStarts = ['sure', 'certainly', 'of course', "i'm sorry", 'as an ai'];
+  for (let b of bannedStarts) {
+    if (text.toLowerCase().startsWith(b)) {
+      text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
     }
   }
-  text = stripDevanagari(text);
-  if (!text || text.length < 2) return getRandomFallback();
-  return text;
-}
-
-// ─── 50 SENTENCES VOICE TRIGGER MAPPING ─────────────────────────────────────
-function detectVoiceTrigger(userMsg) {
-  const lower = (userMsg || '').toLowerCase();
-
-  if (lower.includes('engineering') || lower.includes('admission') || lower.includes('college')) {
-    return 'college_madhe';
-  }
-
-  if (lower.includes('good morning') || lower.includes('uthlas')) return 'gm';
-  if (lower.includes('kuth gela') || lower.includes('bol na')) return 'greeting';
-  if (lower.includes('kay chaltoy') || lower.includes('mg')) return 'kay_chaltoy';
-  if (lower.includes('kasa ahes')) return 'hi_kasa';
-  if (lower.includes('aathvan')) return 'aathvan';
-  if (lower.includes('kuthe ahes') || lower.includes('kuth ahes')) return 'kuth_ahes';
-  if (lower.includes('reply') || lower.includes('vel laavtoos')) return 'late_reply';
-  if (lower.includes('busy')) return 'busy_kuthe';
-  if (lower.includes('free')) return 'free_ahes';
-  if (lower.includes('bhetayla')) return 'bhetayla_ye';
-
-  if (lower.includes('love you') || lower.includes('prem')) return 'love_you';
-  if (lower.includes('prem karte')) return 'prem_karte';
-  if (lower.includes('miss')) return 'miss_karte';
-  if (lower.includes('maza ahes') || lower.includes('samajla')) return 'mazach_ahes';
-  if (lower.includes('pagal')) return 'pagal';
-  if (lower.includes('cute') || lower.includes('photo')) return 'cute_photo';
-  if (lower.includes('shivay') || lower.includes('karamtach')) return 'shivay_karamtach';
-  if (lower.includes('nazar')) return 'nazar';
-  if (lower.includes('favorite')) return 'favorite';
-  if (lower.includes('pillu')) return 'cute_pillu';
-
-  if (lower.includes('jevan') || lower.includes('jevlas')) return 'jevan_zala';
-  if (lower.includes('khallos')) return 'kay_khallos';
-  if (lower.includes('lectures')) return 'lectures_chalu';
-  if (lower.includes('thoda vel')) return 'thoda_vel';
-  if (lower.includes('ghri pohchlo') || lower.includes('ghari')) return 'ghri_pohchlo';
-  if (lower.includes('chaha') || lower.includes('chaha zala')) return 'chaha_zala';
-  if (lower.includes('thakliye') || lower.includes('tired')) return 'thakliye';
-  if (lower.includes('jevan zalyavar')) return 'jevan_zalyavar';
-  if (lower.includes('abhyas')) return 'abhyas_kartiye';
-
-  if (lower.includes('bolu nako')) return 'bolu_nako';
-  if (lower.includes('bolnarach nahi')) return 'bolnarach_nahi';
-  if (lower.includes('khot boltoos')) return 'khot_boltoos';
-  if (lower.includes('konashi boltoy')) return 'konashi_boltoy';
-  if (lower.includes('thamb tula sangte')) return 'tula_sangte';
-  if (lower.includes('mazaak')) return 'mazaak_hoti';
-  if (lower.includes('radu nako') || lower.includes('sorry')) return 'radu_nako';
-  if (lower.includes('block')) return 'block_karun';
-  if (lower.includes('aiktoch nahis')) return 'aiktoch_nahis';
-  if (lower.includes('rag ala')) return 'rag_ala';
-
-  if (lower.includes('call kar na') || lower.includes('call fast')) return 'call_fast';
-  if (lower.includes('video call')) return 'video_call';
-  if (lower.includes('phone thevte') || lower.includes('bye')) return 'phone_thevte';
-  if (lower.includes('good night') || lower.includes('sweet dreams')) return 'good_night';
-  if (lower.includes('zop zali')) return 'zop_zali';
-  if (lower.includes('svapnat')) return 'svapnat_mi';
-  if (lower.includes('uthlvar')) return 'pahila_msg';
-  if (lower.includes('nid yetiye') || lower.includes('zop')) return 'nid_yetiye';
-  if (lower.includes('udya lavkar')) return 'udya_lavkar';
-  if (lower.includes('take care')) return 'bye_babu';
-
-  return null;
+  return stripDevanagari(text) || 'hmm babu';
 }
 
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
-  const history = getHistory(jid);
   try {
     const res = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'system', content: getSystemPrompt() }].concat(history),
+      messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_tokens: 100,
-      temperature: 0.92,
+      temperature: 0.9,
     });
-    let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
-    const reply = fixReply(raw ? raw.trim() : '');
+    const reply = fixReply(res?.choices?.[0]?.message?.content || '');
     addToHistory(jid, 'assistant', reply);
-
-    const voiceClip = detectVoiceTrigger(userMsg);
-    return { text: reply, voice: voiceClip };
+    return reply;
   } catch (err) {
-    console.error('[Groq Error]', err.message || err);
-    return { text: getRandomFallback(), voice: detectVoiceTrigger(userMsg) };
+    console.error('[Groq Error]', err.message);
+    return 'hmm kay boltoys';
   }
 }
 
-// ─── PROACTIVE MESSAGING (ती स्वतःहून दर 1-2 तासांनी मेसेज करेल) ────────────
-let lastActiveJid = null;        // ज्याच्याशी शेवटचं बोलणं झालं तो jid
-let proactiveTimer = null;
-
-const PROACTIVE_MIN_MS = 60 * 60 * 1000;   // 1 तास
-const PROACTIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 तास
-
-async function getProactiveStarterMessage(jid) {
-  const history = getHistory(jid);
-  const starterPrompt = `You are about to text ${BOY_NAME} FIRST, out of nowhere — he hasn't messaged you recently. Send a short, natural opening text that fits your current mood and the time of day (e.g. "kay krtoys", "aathvan aali tuzi", a random thought, a mild complaint if you're in an angry/emotional mood, something about your day). Do NOT greet like a bot, do NOT explain, just text like a real girlfriend randomly texting first. Reply with ONLY the message text, nothing else.`;
-
-  try {
-    const res = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'system', content: getSystemPrompt() }]
-        .concat(history.slice(-6))
-        .concat([{ role: 'user', content: starterPrompt }]),
-      max_tokens: 80,
-      temperature: 0.95,
+// ─── ELEVENLABS LIVE VOICE GENERATOR ──────────────────────────────────────────
+async function generateElevenLabsAudio(text) {
+  return new Promise((resolve, reject) => {
+    if(!ELEVENLABS_API_KEY) return reject(new Error('API Key missing'));
+    
+    const data = JSON.stringify({
+      text: text,
+      model_id: "eleven_multilingual_v2",
+      voice_settings: { stability: 0.5, similarity_boost: 0.75 }
     });
-    let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
-    return fixReply(raw ? raw.trim() : '');
-  } catch (err) {
-    console.error('[Groq Proactive Error]', err.message || err);
-    return getRandomFallback();
-  }
-}
 
-function scheduleNextProactiveMessage(sock) {
-  if (proactiveTimer) clearTimeout(proactiveTimer);
-  const delay = Math.floor(Math.random() * (PROACTIVE_MAX_MS - PROACTIVE_MIN_MS + 1)) + PROACTIVE_MIN_MS;
-  console.log('[Proactive] Next auto-message in ' + Math.round(delay / 60000) + ' min');
-
-  proactiveTimer = setTimeout(async () => {
-    try {
-      if (lastActiveJid) {
-        const text = await getProactiveStarterMessage(lastActiveJid);
-        addToHistory(lastActiveJid, 'assistant', text);
-        await sock.sendPresenceUpdate('composing', lastActiveJid);
-        await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
-        await sock.sendMessage(lastActiveJid, { text });
-        await sock.sendPresenceUpdate('paused', lastActiveJid);
-        console.log('[Proactive] Sent to ' + lastActiveJid + ': ' + text);
-      } else {
-        console.log('[Proactive] No active chat yet, skipping this round.');
+    const options = {
+      hostname: 'api.elevenlabs.io',
+      port: 443,
+      path: '/v1/text-to-speech/' + ELEVENLABS_VOICE_ID,
+      method: 'POST',
+      headers: {
+        'xi-api-key': ELEVENLABS_API_KEY,
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
       }
-    } catch (err) {
-      console.error('[Proactive Error]', err.message || err);
-    }
-    scheduleNextProactiveMessage(sock);
-  }, delay);
+    };
+
+    const req = https.request(options, (res) => {
+      if (res.statusCode !== 200) return reject(new Error('ElevenLabs Error: ' + res.statusCode));
+      const filepath = path.join(__dirname, 'temp_voice_' + Date.now() + '.mp3');
+      const file = fs.createWriteStream(filepath);
+      res.pipe(file);
+      file.on('finish', () => { file.close(); resolve(filepath); });
+    });
+    req.on('error', (e) => reject(e));
+    req.write(data);
+    req.end();
+  });
 }
 
-function randomDelay(min = 4000, max = 8000) {
+function randomDelay(min = 3000, max = 6000) {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
 const msgBuffer = {};
-const BUFFER_WAIT = 2500;
-
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('session_auth');
   const { version } = await fetchLatestBaileysVersion();
-
   const sock = makeWASocket({
-    version,
-    auth: state,
-    browser: Browsers.macOS('Desktop'),
-    logger: pino({ level: 'silent' }),
-    markOnlineOnConnect: false,
-    syncFullHistory: false,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 25000,
+    version, auth: state, logger: pino({ level: 'silent' }), browser: Browsers.macOS('Desktop'),
     printQRInTerminal: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
-
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      latestQR = qr;
-      connectionStatus = 'qr';
-      console.log('\n📷 New QR code generated — open: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
-    }
-
+    if (qr) { latestQR = qr; connectionStatus = 'qr'; }
     if (connection === 'open') {
-      console.log(`✅ [WhatsApp] ${GIRL_NAME} Connected & Running 24/7 with Voice Notes!`);
-      connectionStatus = 'connected';
-      latestQR = null;
-      scheduleNextProactiveMessage(sock);
+      console.log(`✅ [WhatsApp] ${GIRL_NAME} Connected & Live with Real Voices!`);
+      connectionStatus = 'connected'; latestQR = null;
     } else if (connection === 'close') {
       connectionStatus = 'disconnected';
-      if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
-      const code = lastDisconnect?.error?.output?.statusCode;
-      console.log('[WA] Disconnected. Code: ' + code);
-      if (code !== DisconnectReason.loggedOut) {
-        console.log('[WA] Reconnecting in 5s...');
-        setTimeout(startBot, 5000);
-      } else {
-        console.log('[WA] Logged out. Delete session_auth and restart.');
-      }
+      if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) setTimeout(startBot, 5000);
     }
   });
 
@@ -422,22 +210,14 @@ async function startBot() {
     const { messages, type } = upsert;
     if (type !== 'notify') return;
 
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
+    for (let msg of messages) {
       try {
         if (msg.key?.fromMe) continue;
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
 
-        const text =
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          msg.message?.imageMessage?.caption ||
-          '';
-
+        const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
         if (!text.trim()) continue;
-        console.log('[MSG from ' + jid + ']: ' + text);
-        lastActiveJid = jid; // ती याच जीडीला परत स्वतःहून मेसेज करेल
 
         if (msgBuffer[jid]) {
           clearTimeout(msgBuffer[jid].timer);
@@ -454,43 +234,34 @@ async function startBot() {
             try { await sock.readMessages([capturedMsg.key]); } catch (e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch (e) {}
 
-            await randomDelay(4000, 8000);
-            const aiRes = await getAIReply(capturedJid, combined);
+            await randomDelay();
+            const aiText = await getAIReply(capturedJid, combined);
+            
+            // Send Text Reply
+            await sock.sendMessage(capturedJid, { text: aiText });
+            console.log(`[TEXT SENT] ${aiText}`);
 
-            try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
-
-            await sock.sendMessage(capturedJid, { text: aiRes.text });
-            console.log('[REPLY to ' + capturedJid + ']: ' + aiRes.text);
-
-            if (aiRes.voice) {
-              const oggPath = path.join(__dirname, 'voice_clips', `${aiRes.voice}.ogg`);
-              const mp3Path = path.join(__dirname, 'voice_clips', `${aiRes.voice}.mp3`);
-              const filePath = fs.existsSync(oggPath) ? oggPath : mp3Path;
-
-              if (fs.existsSync(filePath)) {
-                try {
-                  await sock.sendPresenceUpdate('recording', capturedJid);
-                  await new Promise((r) => setTimeout(r, 1200));
-                  await sock.sendMessage(capturedJid, {
-                    audio: fs.readFileSync(filePath),
-                    mimetype: 'audio/ogg; codecs=opus',
-                    ptt: true,
-                  });
-                  console.log(`[VOICE SENT]: ${path.basename(filePath)} 🎤`);
-                } catch (vErr) {
-                  console.error('[Voice Send Error]', vErr.message);
-                }
-              }
+            // Generate & Send Live Voice Note
+            try {
+              await sock.sendPresenceUpdate('recording', capturedJid);
+              const audioPath = await generateElevenLabsAudio(aiText);
+              
+              await sock.sendMessage(capturedJid, {
+                audio: fs.readFileSync(audioPath),
+                mimetype: 'audio/mp4',
+                ptt: true,
+              });
+              console.log(`[VOICE SENT] 🎤 Live Audio Generated & Sent!`);
+              
+              fs.unlinkSync(audioPath); // Delete temp file after sending
+            } catch (vErr) {
+              console.error('[Voice Error]', vErr.message);
             }
-
-            try { await sock.sendPresenceUpdate('unavailable', capturedJid); } catch (e) {}
-          }, BUFFER_WAIT);
+            try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
+          }, 2500);
         })(jid, msg);
-      } catch (err) {
-        console.error('[MSG Handler Error]', err.message || err);
-      }
+      } catch (err) {}
     }
   });
 }
-
 startBot().catch(console.error);
