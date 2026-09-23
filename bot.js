@@ -311,6 +311,59 @@ async function getAIReply(jid, userMsg) {
   }
 }
 
+// ─── PROACTIVE MESSAGING (ती स्वतःहून दर 1-2 तासांनी मेसेज करेल) ────────────
+let lastActiveJid = null;        // ज्याच्याशी शेवटचं बोलणं झालं तो jid
+let proactiveTimer = null;
+
+const PROACTIVE_MIN_MS = 60 * 60 * 1000;   // 1 तास
+const PROACTIVE_MAX_MS = 2 * 60 * 60 * 1000; // 2 तास
+
+async function getProactiveStarterMessage(jid) {
+  const history = getHistory(jid);
+  const starterPrompt = `You are about to text ${BOY_NAME} FIRST, out of nowhere — he hasn't messaged you recently. Send a short, natural opening text that fits your current mood and the time of day (e.g. "kay krtoys", "aathvan aali tuzi", a random thought, a mild complaint if you're in an angry/emotional mood, something about your day). Do NOT greet like a bot, do NOT explain, just text like a real girlfriend randomly texting first. Reply with ONLY the message text, nothing else.`;
+
+  try {
+    const res = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [{ role: 'system', content: getSystemPrompt() }]
+        .concat(history.slice(-6))
+        .concat([{ role: 'user', content: starterPrompt }]),
+      max_tokens: 80,
+      temperature: 0.95,
+    });
+    let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
+    return fixReply(raw ? raw.trim() : '');
+  } catch (err) {
+    console.error('[Groq Proactive Error]', err.message || err);
+    return getRandomFallback();
+  }
+}
+
+function scheduleNextProactiveMessage(sock) {
+  if (proactiveTimer) clearTimeout(proactiveTimer);
+  const delay = Math.floor(Math.random() * (PROACTIVE_MAX_MS - PROACTIVE_MIN_MS + 1)) + PROACTIVE_MIN_MS;
+  console.log('[Proactive] Next auto-message in ' + Math.round(delay / 60000) + ' min');
+
+  proactiveTimer = setTimeout(async () => {
+    try {
+      if (lastActiveJid) {
+        const text = await getProactiveStarterMessage(lastActiveJid);
+        addToHistory(lastActiveJid, 'assistant', text);
+        await sock.sendPresenceUpdate('composing', lastActiveJid);
+        await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
+        await sock.sendMessage(lastActiveJid, { text });
+        await sock.sendPresenceUpdate('paused', lastActiveJid);
+        console.log('[Proactive] Sent to ' + lastActiveJid + ': ' + text);
+      } else {
+        console.log('[Proactive] No active chat yet, skipping this round.');
+      }
+    } catch (err) {
+      console.error('[Proactive Error]', err.message || err);
+    }
+    scheduleNextProactiveMessage(sock);
+  }, delay);
+}
+
 function randomDelay(min = 4000, max = 8000) {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
@@ -350,8 +403,10 @@ async function startBot() {
       console.log(`✅ [WhatsApp] ${GIRL_NAME} Connected & Running 24/7 with Voice Notes!`);
       connectionStatus = 'connected';
       latestQR = null;
+      scheduleNextProactiveMessage(sock);
     } else if (connection === 'close') {
       connectionStatus = 'disconnected';
+      if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
       const code = lastDisconnect?.error?.output?.statusCode;
       console.log('[WA] Disconnected. Code: ' + code);
       if (code !== DisconnectReason.loggedOut) {
@@ -382,6 +437,7 @@ async function startBot() {
 
         if (!text.trim()) continue;
         console.log('[MSG from ' + jid + ']: ' + text);
+        lastActiveJid = jid; // ती याच जीडीला परत स्वतःहून मेसेज करेल
 
         if (msgBuffer[jid]) {
           clearTimeout(msgBuffer[jid].timer);
