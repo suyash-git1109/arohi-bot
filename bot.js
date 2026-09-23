@@ -6,7 +6,6 @@ const {
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
 const { Groq } = require('groq-sdk');
-const qrcode = require('qrcode-terminal');
 const pino = require('pino');
 const http = require('http');
 const https = require('https');
@@ -18,6 +17,9 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || 'gsk_YcDw3VuqJyEOtXA0vNBvWGdyb3
 const RENDER_URL   = 'https://arohi-bot.onrender.com';
 const BOY_NAME     = 'Suyash';
 const PORT         = process.env.PORT || 3000;
+
+// तुझा WhatsApp नंबर, country code सकट, +/space/dash शिवाय. उदा: 919876543210
+const PHONE_NUMBER = process.env.PHONE_NUMBER || '91XXXXXXXXXX';
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
@@ -214,13 +216,24 @@ async function startBot() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect, qr } = update;
+  // ─── PAIRING CODE (QR ऐवजी) ─────────────────────────────────────────────
+  // Session आधीच register झालेली नसेल तरच नवीन pairing code मागतो.
+  if (!sock.authState.creds.registered) {
+    setTimeout(async () => {
+      try {
+        const code = await sock.requestPairingCode(PHONE_NUMBER);
+        console.log('\n🔑 ═══════════════════════════════');
+        console.log('🔑  Pairing Code: ' + code);
+        console.log('🔑 ═══════════════════════════════\n');
+        console.log('फोनवर: WhatsApp > Settings > Linked Devices > Link with phone number > वरचा कोड टाक');
+      } catch (e) {
+        console.log('[Pairing Error]', e.message || e);
+      }
+    }, 3000);
+  }
 
-    if (qr) {
-      console.log('\n📷 QR Code scan kar WhatsApp se:\n');
-      qrcode.generate(qr, { small: true });
-    }
+  sock.ev.on('connection.update', (update) => {
+    const { connection, lastDisconnect } = update;
 
     if (connection === 'open') {
       console.log('✅ [WhatsApp] Arohi Connected & Running 24/7 with Voice Notes!');
