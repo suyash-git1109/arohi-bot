@@ -130,7 +130,7 @@ async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
   try {
     const res = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: 'llama-3.1-70b-versatile',
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_tokens: 100,
       temperature: 0.9,
@@ -140,7 +140,7 @@ async function getAIReply(jid, userMsg) {
     return reply;
   } catch (err) {
     console.error('[Groq Error]', err.message);
-    return 'hmm kay boltoys';
+    return 'hmm babu thodi busy aahe me, nantar bolte';
   }
 }
 
@@ -185,6 +185,8 @@ function randomDelay(min = 3000, max = 6000) {
 }
 
 const msgBuffer = {};
+const processedMsgs = new Set(); // Double msg fix
+
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('session_auth');
   const { version } = await fetchLatestBaileysVersion();
@@ -215,6 +217,14 @@ async function startBot() {
         if (msg.key?.fromMe) continue;
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
+
+        // Double msg fix
+        if (processedMsgs.has(msg.key.id)) continue;
+        processedMsgs.add(msg.key.id);
+        if (processedMsgs.size > 200) {
+            const iterator = processedMsgs.values();
+            processedMsgs.delete(iterator.next().value);
+        }
 
         const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
         if (!text.trim()) continue;
