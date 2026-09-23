@@ -198,6 +198,9 @@ function randomDelay(min = 4000, max = 8000) {
 const msgBuffer = {};
 const BUFFER_WAIT = 2500;
 
+// पेअरिंग कोड एकाच वेळी एकदाच मागितला जावा यासाठी guard
+let pairingCodeRequested = false;
+
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('session_auth');
   const { version } = await fetchLatestBaileysVersion();
@@ -217,8 +220,9 @@ async function startBot() {
   sock.ev.on('creds.update', saveCreds);
 
   // ─── PAIRING CODE (QR ऐवजी) ─────────────────────────────────────────────
-  // Session आधीच register झालेली नसेल तरच नवीन pairing code मागतो.
-  if (!sock.authState.creds.registered) {
+  // Session register झालेली नसेल आणि आधी कोड मागितलेला नसेल तरच नवीन कोड मागतो.
+  if (!sock.authState.creds.registered && !pairingCodeRequested) {
+    pairingCodeRequested = true;
     setTimeout(async () => {
       try {
         const code = await sock.requestPairingCode(PHONE_NUMBER);
@@ -226,8 +230,10 @@ async function startBot() {
         console.log('🔑  Pairing Code: ' + code);
         console.log('🔑 ═══════════════════════════════\n');
         console.log('फोनवर: WhatsApp > Settings > Linked Devices > Link with phone number > वरचा कोड टाक');
+        console.log('हा कोड ~30-60 सेकंदात टाक, नाहीतर expire होईल.');
       } catch (e) {
         console.log('[Pairing Error]', e.message || e);
+        pairingCodeRequested = false; // पुन्हा प्रयत्न करता यावा म्हणून
       }
     }, 3000);
   }
@@ -237,12 +243,17 @@ async function startBot() {
 
     if (connection === 'open') {
       console.log('✅ [WhatsApp] Arohi Connected & Running 24/7 with Voice Notes!');
+      pairingCodeRequested = false;
     } else if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       console.log('[WA] Disconnected. Code: ' + code);
       if (code !== DisconnectReason.loggedOut) {
-        console.log('[WA] Reconnecting in 5s...');
-        setTimeout(startBot, 5000);
+        // Pairing अजून पूर्ण झालेली नसेल (registered नाही) तर जास्त वेळ थांबून
+        // पुन्हा कनेक्ट कर, जेणेकरून फोनवर कोड टाकायला वेळ मिळेल आणि लूप होणार नाही.
+        const notRegisteredYet = !sock.authState.creds.registered;
+        const delay = notRegisteredYet ? 45000 : 5000;
+        console.log('[WA] Reconnecting in ' + (delay / 1000) + 's...');
+        setTimeout(startBot, delay);
       } else {
         console.log('[WA] Logged out. Delete session_auth and restart.');
       }
