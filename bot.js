@@ -11,20 +11,67 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const QRCode = require('qrcode');
+const url = require('url');
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
 const RENDER_URL   = 'https://arohi-bot.onrender.com';
 const BOY_NAME     = 'Suyash';
 const PORT         = process.env.PORT || 3000;
-
-// तुझा WhatsApp नंबर, country code सकट, +/space/dash शिवाय. उदा: 919876543210
-const PHONE_NUMBER = process.env.PHONE_NUMBER || '91XXXXXXXXXX';
+const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
-// Keep-alive HTTP Server
-http.createServer((req, res) => res.end('Arohi bot alive ✅')).listen(PORT, () =>
+// ─── QR CODE STATE ────────────────────────────────────────────────────────────
+let latestQR = null;       // raw QR string from Baileys
+let connectionStatus = 'starting'; // starting | qr | connected | disconnected
+
+// ─── Keep-alive + QR HTTP Server ──────────────────────────────────────────────
+http.createServer(async (req, res) => {
+  const parsed = url.parse(req.url, true);
+
+  if (parsed.pathname === '/qr') {
+    const key = parsed.query.key;
+    if (key !== QR_TOKEN) {
+      res.writeHead(403, { 'Content-Type': 'text/plain' });
+      return res.end('Forbidden');
+    }
+
+    if (connectionStatus === 'connected') {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      return res.end('<h2 style="font-family:sans-serif;color:green">✅ WhatsApp Connected! Bot is live.</h2>');
+    }
+
+    if (!latestQR) {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html><head><meta http-equiv="refresh" content="3"></head><body style="font-family:sans-serif;background:#111;color:#fff"><h2>Generating QR code... (auto-refresh in 3s)</h2></body></html>');
+      return;
+    }
+
+    try {
+      const qrImage = await QRCode.toDataURL(latestQR, { width: 320, margin: 2 });
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(`
+        <html>
+        <head><meta http-equiv="refresh" content="20"></head>
+        <body style="font-family:sans-serif;background:#111;color:#fff;text-align:center;padding-top:40px">
+          <h2>Arohi Bot — Scan to Connect WhatsApp</h2>
+          <img src="${qrImage}" style="background:#fff;padding:16px;border-radius:8px" />
+          <p>QR refreshes automatically. Open WhatsApp &gt; Settings &gt; Linked Devices &gt; Link a Device, then scan.</p>
+        </body>
+        </html>
+      `);
+    } catch (e) {
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error generating QR: ' + e.message);
+    }
+    return;
+  }
+
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Arohi bot alive ✅ status: ' + connectionStatus);
+}).listen(PORT, () =>
   console.log('[Server] Running on port ' + PORT)
 );
 
@@ -102,12 +149,10 @@ function fixReply(text) {
 function detectVoiceTrigger(userMsg) {
   const lower = (userMsg || '').toLowerCase();
 
-  // Engineering & College / Admission specific
   if (lower.includes('engineering') || lower.includes('admission') || lower.includes('college')) {
     return 'college_madhe';
   }
 
-  // Greetings & Morning / Evening
   if (lower.includes('good morning') || lower.includes('uthlas')) return 'gm';
   if (lower.includes('kuth gela') || lower.includes('bol na')) return 'greeting';
   if (lower.includes('kay chaltoy') || lower.includes('mg')) return 'kay_chaltoy';
@@ -119,7 +164,6 @@ function detectVoiceTrigger(userMsg) {
   if (lower.includes('free')) return 'free_ahes';
   if (lower.includes('bhetayla')) return 'bhetayla_ye';
 
-  // Romance & Love
   if (lower.includes('love you') || lower.includes('prem')) return 'love_you';
   if (lower.includes('prem karte')) return 'prem_karte';
   if (lower.includes('miss')) return 'miss_karte';
@@ -131,7 +175,6 @@ function detectVoiceTrigger(userMsg) {
   if (lower.includes('favorite')) return 'favorite';
   if (lower.includes('pillu')) return 'cute_pillu';
 
-  // Food & Daily Routine
   if (lower.includes('jevan') || lower.includes('jevlas')) return 'jevan_zala';
   if (lower.includes('khallos')) return 'kay_khallos';
   if (lower.includes('lectures')) return 'lectures_chalu';
@@ -142,7 +185,6 @@ function detectVoiceTrigger(userMsg) {
   if (lower.includes('jevan zalyavar')) return 'jevan_zalyavar';
   if (lower.includes('abhyas')) return 'abhyas_kartiye';
 
-  // Anger, Jealousy & Fun fights
   if (lower.includes('bolu nako')) return 'bolu_nako';
   if (lower.includes('bolnarach nahi')) return 'bolnarach_nahi';
   if (lower.includes('khot boltoos')) return 'khot_boltoos';
@@ -154,7 +196,6 @@ function detectVoiceTrigger(userMsg) {
   if (lower.includes('aiktoch nahis')) return 'aiktoch_nahis';
   if (lower.includes('rag ala')) return 'rag_ala';
 
-  // Calls & Good Night
   if (lower.includes('call kar na') || lower.includes('call fast')) return 'call_fast';
   if (lower.includes('video call')) return 'video_call';
   if (lower.includes('phone thevte') || lower.includes('bye')) return 'phone_thevte';
@@ -198,9 +239,6 @@ function randomDelay(min = 4000, max = 8000) {
 const msgBuffer = {};
 const BUFFER_WAIT = 2500;
 
-// पेअरिंग कोड एकाच वेळी एकदाच मागितला जावा यासाठी guard
-let pairingCodeRequested = false;
-
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('session_auth');
   const { version } = await fetchLatestBaileysVersion();
@@ -215,45 +253,31 @@ async function startBot() {
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 60000,
     keepAliveIntervalMs: 25000,
+    printQRInTerminal: false,
   });
 
   sock.ev.on('creds.update', saveCreds);
 
-  // ─── PAIRING CODE (QR ऐवजी) ─────────────────────────────────────────────
-  // Session register झालेली नसेल आणि आधी कोड मागितलेला नसेल तरच नवीन कोड मागतो.
-  if (!sock.authState.creds.registered && !pairingCodeRequested) {
-    pairingCodeRequested = true;
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(PHONE_NUMBER);
-        console.log('\n🔑 ═══════════════════════════════');
-        console.log('🔑  Pairing Code: ' + code);
-        console.log('🔑 ═══════════════════════════════\n');
-        console.log('फोनवर: WhatsApp > Settings > Linked Devices > Link with phone number > वरचा कोड टाक');
-        console.log('हा कोड ~30-60 सेकंदात टाक, नाहीतर expire होईल.');
-      } catch (e) {
-        console.log('[Pairing Error]', e.message || e);
-        pairingCodeRequested = false; // पुन्हा प्रयत्न करता यावा म्हणून
-      }
-    }, 3000);
-  }
-
   sock.ev.on('connection.update', (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      latestQR = qr;
+      connectionStatus = 'qr';
+      console.log('\n📷 New QR code generated — open: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
+    }
 
     if (connection === 'open') {
       console.log('✅ [WhatsApp] Arohi Connected & Running 24/7 with Voice Notes!');
-      pairingCodeRequested = false;
+      connectionStatus = 'connected';
+      latestQR = null;
     } else if (connection === 'close') {
+      connectionStatus = 'disconnected';
       const code = lastDisconnect?.error?.output?.statusCode;
       console.log('[WA] Disconnected. Code: ' + code);
       if (code !== DisconnectReason.loggedOut) {
-        // Pairing अजून पूर्ण झालेली नसेल (registered नाही) तर जास्त वेळ थांबून
-        // पुन्हा कनेक्ट कर, जेणेकरून फोनवर कोड टाकायला वेळ मिळेल आणि लूप होणार नाही.
-        const notRegisteredYet = !sock.authState.creds.registered;
-        const delay = notRegisteredYet ? 45000 : 5000;
-        console.log('[WA] Reconnecting in ' + (delay / 1000) + 's...');
-        setTimeout(startBot, delay);
+        console.log('[WA] Reconnecting in 5s...');
+        setTimeout(startBot, 5000);
       } else {
         console.log('[WA] Logged out. Delete session_auth and restart.');
       }
@@ -300,11 +324,9 @@ async function startBot() {
 
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
 
-            // 1. Text Reply
             await sock.sendMessage(capturedJid, { text: aiRes.text });
             console.log('[REPLY to ' + capturedJid + ']: ' + aiRes.text);
 
-            // 2. Real Voice Note Send (.ogg format for WhatsApp)
             if (aiRes.voice) {
               const oggPath = path.join(__dirname, 'voice_clips', `${aiRes.voice}.ogg`);
               const mp3Path = path.join(__dirname, 'voice_clips', `${aiRes.voice}.mp3`);
