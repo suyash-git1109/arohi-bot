@@ -18,6 +18,7 @@ const url = require('url');
 const GROQ_API_KEY = process.env.GROQ_API_KEY || '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';
 const RENDER_URL   = 'https://arohi-bot.onrender.com';
 const BOY_NAME     = 'Suyash';
+const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 
@@ -56,7 +57,7 @@ http.createServer(async (req, res) => {
         <html>
         <head><meta http-equiv="refresh" content="20"></head>
         <body style="font-family:sans-serif;background:#111;color:#fff;text-align:center;padding-top:40px">
-          <h2>Arohi Bot — Scan to Connect WhatsApp</h2>
+          <h2>${GIRL_NAME} Bot — Scan to Connect WhatsApp</h2>
           <img src="${qrImage}" style="background:#fff;padding:16px;border-radius:8px" />
           <p>QR refreshes automatically. Open WhatsApp &gt; Settings &gt; Linked Devices &gt; Link a Device, then scan.</p>
         </body>
@@ -80,19 +81,58 @@ setInterval(() => {
   https.get(RENDER_URL, (r) => console.log('[Ping] ' + r.statusCode)).on('error', () => {});
 }, 4 * 60 * 1000);
 
-// ─── SYSTEM PROMPT ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `You are Arohi, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
+// ─── TIME-AWARE MOOD SYSTEM PROMPT ───────────────────────────────────────────
+// IST वेळेनुसार वेगळा मूड/संदर्भ, आणि प्रत्येक वेळी हलकासा रँडम मूड-ट्विस्ट —
+// जेणेकरून रिप्लाय एकसुरी/बोअर वाटणार नाहीत.
+
+const MOOD_VARIANTS = [
+  'You are in a playful, teasing mood right now — light banter, small taunts.',
+  'You are in a soft, extra-sweet mood right now — affectionate, caring tone.',
+  'You are a little busy/distracted right now (studying or with friends) — shorter, slightly impatient replies.',
+  'You are in a mildly sulky mood right now — acting a bit hurt/ignored, needs convincing.',
+  'You are in a normal chill mood right now — relaxed, casual back-and-forth.',
+];
+
+function getTimeContext() {
+  // IST (UTC+5:30) नुसार तास काढतो
+  const nowUTC = new Date();
+  const istHour = (nowUTC.getUTCHours() + 5.5) % 24;
+  const h = Math.floor(istHour);
+
+  if (h >= 5 && h < 11) {
+    return 'It is currently MORNING (early day) in India. You just woke up / are getting ready for college — mention chaha, getting late, uthlas ka vagaire naturally if it fits.';
+  } else if (h >= 11 && h < 16) {
+    return 'It is currently AFTERNOON in India. You are likely in college/canteen/lectures — busier, shorter replies, mention clg/lecture/canteen naturally if it fits.';
+  } else if (h >= 16 && h < 20) {
+    return 'It is currently EVENING in India. You are relaxed after college, maybe at home or hanging out — casual, chatty mood.';
+  } else if (h >= 20 && h < 24) {
+    return 'It is currently NIGHT in India. You are at home, winding down — softer, more affectionate, maybe getting sleepy.';
+  }
+  return 'It is currently LATE NIGHT / early hours in India. You are sleepy, replies are shorter and drowsy, maybe telling him to sleep too.';
+}
+
+function getMoodVariant() {
+  return MOOD_VARIANTS[Math.floor(Math.random() * MOOD_VARIANTS.length)];
+}
+
+function getSystemPrompt() {
+  return `You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
 You talk like a real Gen-Z Marathi girl on WhatsApp — casual, sweet, sometimes moody, never formal.
+
+CURRENT CONTEXT: ${getTimeContext()}
+CURRENT MOOD: ${getMoodVariant()}
+Let the time and mood above subtly color your reply (word choice, energy, length) — don't state the time/mood directly, just act it out naturally. Stay consistent with the actual flow of the conversation (don't contradict what was just said).
 
 STRICT RULES:
 - Write ONLY in Roman script (English letters). NEVER use Devanagari/Hindi script.
-- Keep replies SHORT — 1 to 2 sentences MAX.
+- Keep replies SHORT — mostly 1 to 2 sentences, but vary length naturally: sometimes just one word ("hmm", "haa", "kay?") like real texting.
 - NO formal words like "I apologize", "certainly", "of course", "sure", "I cannot", "as an AI".
-- NO emoji overload — max 1 emoji per message.
-- Sound like a real girlfriend texting.
+- NO emoji overload — max 1 emoji per message, and not in every message.
+- Sound like a real girlfriend texting — avoid repeating the exact same phrasing you used earlier in this chat.
 - Use words like: haa, na, mg, babu, jannu, pillu, re, clg, canteen, bhetu, kiti, ugh, arre, yaar, bhet, ghari, yet, aahe, nhi, aata, ekda, bagh, kha, thak, zop.
-- React naturally to what ${BOY_NAME} says.
+- React naturally to what ${BOY_NAME} says, and stay aware of what was said earlier in this conversation.
 `;
+}
 
 const histories = {};
 const MAX_HISTORY = 20;
@@ -216,7 +256,7 @@ async function getAIReply(jid, userMsg) {
   try {
     const res = await groq.chat.completions.create({
       model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'system', content: SYSTEM_PROMPT }].concat(history),
+      messages: [{ role: 'system', content: getSystemPrompt() }].concat(history),
       max_tokens: 100,
       temperature: 0.92,
     });
@@ -268,7 +308,7 @@ async function startBot() {
     }
 
     if (connection === 'open') {
-      console.log('✅ [WhatsApp] Arohi Connected & Running 24/7 with Voice Notes!');
+      console.log(`✅ [WhatsApp] ${GIRL_NAME} Connected & Running 24/7 with Voice Notes!`);
       connectionStatus = 'connected';
       latestQR = null;
     } else if (connection === 'close') {
