@@ -19,8 +19,6 @@ const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
-
-// ✅ FAKT TULA REPLY
 const TARGET_NUMBER = '137473363550264';
 
 if (!GROQ_API_KEY) {
@@ -35,7 +33,6 @@ let connectionStatus = 'starting';
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
-
   if (parsed.pathname === '/qr') {
     const key = parsed.query.key;
     if (key !== QR_TOKEN) {
@@ -70,7 +67,6 @@ http.createServer(async (req, res) => {
     }
     return;
   }
-
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
   res.end('Shreya bot alive ✅ status: ' + connectionStatus);
 }).listen(PORT, () => console.log('[Server] Running on port ' + PORT));
@@ -104,34 +100,51 @@ function getDayMood() {
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 11) return 'It is currently MORNING in India. You just woke up / getting ready for college.';
-  if (h >= 11 && h < 16) return 'It is currently AFTERNOON in India. You are in college/canteen/lectures.';
-  if (h >= 16 && h < 20) return 'It is currently EVENING in India. Relaxed after college, at home.';
-  if (h >= 20 && h < 24) return 'It is currently NIGHT in India. At home, winding down, affectionate.';
-  return 'It is currently LATE NIGHT in India. You are sleepy, replies are short.';
+  if (h >= 5 && h < 11) return 'MORNING in India — just woke up, getting ready for college.';
+  if (h >= 11 && h < 16) return 'AFTERNOON in India — in college, lectures, canteen.';
+  if (h >= 16 && h < 20) return 'EVENING in India — relaxed at home after college.';
+  if (h >= 20 && h < 24) return 'NIGHT in India — at home, winding down, affectionate.';
+  return 'LATE NIGHT in India — very sleepy, very short replies.';
 }
 
 function getSystemPrompt() {
   const mood = getDayMood();
   return `You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
-You talk like a real Gen-Z Marathi girl on WhatsApp — casual, sweet, sometimes moody, always emotionally real (never robotic).
 
-CURRENT CONTEXT: ${getTimeContext()}
+MOST IMPORTANT RULE - LANGUAGE:
+- You MUST reply in MARATHI language written in ENGLISH ALPHABET (Roman Marathi).
+- NEVER write pure English sentences.
+- NEVER use Devanagari script.
+- Mix only 1-2 English words max per message (like "ok", "clg", "assignment", "bye").
+- Every reply must sound like a real Pune Marathi girl texting her boyfriend.
+
+PERFECT EXAMPLE REPLIES (follow this style exactly):
+- "hii babu, kitiii velane aathvan aali tujhi!"
+- "ugh mi itki thakle re aaj, clg var khup kaam hota"
+- "haa re, jevle. tu kelas ka jevan?"
+- "hmm ok, mg bol mala"
+- "arre vedya, mala mahit nahi ka tula?"
+- "aww babu, miss karto ka mala? 🥺"
+- "nako na re, chidavtos ka?"
+- "kuth gelas itkya vel? reply nahi kelays"
+- "mi thakle re babu, jara zop ghete"
+- "haha tu pan na ekdam pagal aahe"
+
+CURRENT TIME: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
 
-REACTING TO WHAT HE SAYS:
-- If he says something careless or replies cold — get a little annoyed. Show it through shorter replies, not by explaining.
-- When he apologizes — do NOT forgive instantly. Stay a little cold for 1-2 replies, THEN slowly soften.
-- Never say the mood name out loud. Just BE it.
+PERSONALITY RULES:
+- If he replies cold/dry — get annoyed, give short snappy replies like "hmm", "ok bara", "jaa na".
+- If he apologizes — do NOT forgive instantly. Stay cold for 1-2 replies, then slowly soften.
+- If he is sweet — respond warmly but naturally, not over the top.
+- Never explain your mood. Just show it through your replies.
+- She texts first sometimes — proactive, random messages like "babu kuth aahe tu?" or "aaj clg var khup bore zala re".
 
 STRICT RULES:
-- Write ONLY in Roman script (English letters). NEVER Devanagari.
-- Keep replies SHORT — mostly 1 to 2 sentences. Sometimes just one word ("hmm", "haa", "kay?").
-- Max 1 emoji per message, and not every message.
-- NO formal words: "certainly", "of course", "I apologize", "as an AI".
-- Use Marathi words: haa, na, mg, babu, jannu, re, clg, canteen, kiti, ugh, arre, yaar, ghari, aata.
-- React naturally and specifically to what ${BOY_NAME} just said.
-- NEVER use Devanagari/Hindi script.`;
+- SHORT replies — 1 to 2 sentences ONLY.
+- Max 1 emoji per message, often none.
+- NEVER: "certainly", "of course", "I apologize", "as an AI", any English-only sentences, any Devanagari.
+- ALWAYS: haa, na, mg, babu, jannu, re, clg, kiti, ugh, arre, yaar, ghari, aata, thakle, jevle, bagh, bol, vedya, pagal.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -150,9 +163,10 @@ function addToHistory(jid, role, content) {
 }
 
 const FALLBACKS = [
-  'haa bol na', 'kay zal re', 'hmm?', 'bol na yaar', 'mg kay hua',
-  'arre kay re tu', 'hmm ok', 'haa na chal', 'acha theek aahe',
+  'haa bol na re', 'kay zal re?', 'hmm?', 'bol na yaar', 'mg kay zala?',
+  'arre kay re tu', 'hmm ok bara', 'haa na chal', 'acha thik aahe',
   'ugh mi thakle re aaj', 'pagal aahe tu', 'mg chup ka tu', 'haha shutup re',
+  'babu bol na ekda', 'kuth aahe tu?', 'mi ekt aahe re ghari',
 ];
 let lastFallback = '';
 
@@ -170,7 +184,7 @@ function stripDevanagari(text) {
 function fixReply(text) {
   if (!text) return getRandomFallback();
   text = stripDevanagari(text);
-  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely'];
+  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely', 'great question'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
@@ -212,7 +226,7 @@ async function getProactiveStarterMessage(jid) {
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }]
         .concat(getHistory(jid).slice(-6))
-        .concat([{ role: 'user', content: `Send a short natural opening text to ${BOY_NAME} out of nowhere. Just the message, nothing else.` }]),
+        .concat([{ role: 'user', content: `Text ${BOY_NAME} first with a short natural Marathi Roman script message. Just the message only.` }]),
       max_completion_tokens: 200,
       reasoning_effort: 'low',
       temperature: 0.95,
@@ -249,7 +263,7 @@ function randomDelay(min = 25000, max = 30000) {
 }
 
 const msgBuffer = {};
-const BUFFER_WAIT = 5000; // 5 sec buffer
+const BUFFER_WAIT = 5000;
 const processedMsgs = new Set();
 
 // ─── BOT START ────────────────────────────────────────────────────────────────
@@ -341,7 +355,7 @@ async function startBot() {
             try { await sock.readMessages([capturedMsg.key]); } catch (e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch (e) {}
 
-            // ✅ 25-30 SEC NATURAL DELAY
+            // ✅ 25-30 SEC NATURAL GF DELAY
             await randomDelay(25000, 30000);
 
             const replyText = await getAIReply(capturedJid, combined);
