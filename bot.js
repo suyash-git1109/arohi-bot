@@ -20,7 +20,7 @@ const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 
-// ✅ FAKT TULA REPLY - Tujha actual WhatsApp number
+// ✅ FAKT TULA REPLY
 const TARGET_NUMBER = '137473363550264';
 
 if (!GROQ_API_KEY) {
@@ -233,7 +233,7 @@ function scheduleNextProactiveMessage(sock) {
         const text = await getProactiveStarterMessage(lastActiveJid);
         addToHistory(lastActiveJid, 'assistant', text);
         await sock.sendPresenceUpdate('composing', lastActiveJid);
-        await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
+        await new Promise((r) => setTimeout(r, 25000 + Math.random() * 5000));
         await sock.sendMessage(lastActiveJid, { text });
         await sock.sendPresenceUpdate('paused', lastActiveJid);
         console.log('[Proactive] Sent: ' + text);
@@ -243,12 +243,13 @@ function scheduleNextProactiveMessage(sock) {
   }, delay);
 }
 
-function randomDelay(min = 4000, max = 8000) {
+// ✅ 25-30 SEC NATURAL GF DELAY
+function randomDelay(min = 25000, max = 30000) {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
 const msgBuffer = {};
-const BUFFER_WAIT = 2500;
+const BUFFER_WAIT = 5000; // 5 sec buffer
 const processedMsgs = new Set();
 
 // ─── BOT START ────────────────────────────────────────────────────────────────
@@ -303,7 +304,7 @@ async function startBot() {
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
 
-        // ✅ FAKT TULA REPLY - Baaki saglyana ignore
+        // ✅ FAKT SUYASH LA REPLY
         const senderNum = jid.split('@')[0];
         if (senderNum !== TARGET_NUMBER) {
           console.log('[Ignored] Not target: ' + senderNum);
@@ -339,7 +340,10 @@ async function startBot() {
 
             try { await sock.readMessages([capturedMsg.key]); } catch (e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch (e) {}
-            await randomDelay(4000, 8000);
+
+            // ✅ 25-30 SEC NATURAL DELAY
+            await randomDelay(25000, 30000);
+
             const replyText = await getAIReply(capturedJid, combined);
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
             await sock.sendMessage(capturedJid, { text: replyText });
