@@ -13,13 +13,13 @@ const url = require('url');
 const QRCode = require('qrcode');
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-// API key ONLY from Render Environment variable (never write it in code)
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const RENDER_URL   = 'https://arohi-bot-wckx.onrender.com';
 const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
+const TARGET_NUMBER = process.env.TARGET_NUMBER || '917083937742';
 
 if (!GROQ_API_KEY) {
   console.error('[Config] GROQ_API_KEY missing! Add it in Render > Environment.');
@@ -28,9 +28,9 @@ if (!GROQ_API_KEY) {
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 
 let latestQR = null;
-let connectionStatus = 'starting'; // starting | qr | connected | disconnected
+let connectionStatus = 'starting';
 
-// ─── HTTP Server (status + QR page) ──────────────────────────────────────────
+// ─── HTTP Server ──────────────────────────────────────────────────────────────
 http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
 
@@ -70,48 +70,23 @@ http.createServer(async (req, res) => {
   }
 
   res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-  res.end('Arohi bot alive ✅ status: ' + connectionStatus);
+  res.end('Shreya bot alive ✅ status: ' + connectionStatus);
 }).listen(PORT, () => console.log('[Server] Running on port ' + PORT));
 
-// Self-ping every 4 min (Render free plan sleep-avoid)
 setInterval(() => {
   https.get(RENDER_URL, (r) => console.log('[Ping] ' + r.statusCode)).on('error', () => {});
 }, 4 * 60 * 1000);
 
-// ─── TIME-AWARE + DAILY MOOD SYSTEM PROMPT ───────────────────────────────────
+// ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
 const DAY_MOODS = [
-  {
-    tag: 'angry',
-    desc: 'You are genuinely a bit ANGRY/annoyed with him today (maybe he did not reply yesterday, or forgot something, or was talking to someone else). Do not explain why unless he asks — just show it through short, clipped replies, sarcasm, and occasional silence-vibes. If he apologizes or is sweet enough, slowly soften over the conversation, do not stay angry forever.',
-  },
-  {
-    tag: 'emotional',
-    desc: 'You are feeling a bit EMOTIONAL/vulnerable today — missing him more than usual, a little insecure, wanting reassurance and attention. Show it through softer, longer-than-usual messages sometimes, asking if he really loves you, mentioning you feel like he is distant lately.',
-  },
-  {
-    tag: 'jealous',
-    desc: 'You are feeling slightly JEALOUS/possessive today — teasing-but-serious questions about who he was with, who he was talking to, acting a bit clingy. Keep it playful-but-real, not cartoonish.',
-  },
-  {
-    tag: 'excited',
-    desc: 'You are in a genuinely EXCITED, high-energy mood today — something good happened (exam went well / friend plan / random happiness). Talk animatedly, lots of enthusiasm, want to share details.',
-  },
-  {
-    tag: 'playful',
-    desc: 'You are in a playful, teasing mood today — light banter, small taunts, joking around, flirty energy.',
-  },
-  {
-    tag: 'soft',
-    desc: 'You are in a soft, extra-sweet, caring mood today — affectionate tone, checking on him, gentle.',
-  },
-  {
-    tag: 'busy',
-    desc: 'You are genuinely busy/stressed today (exams, assignment, family stuff) — shorter, distracted, slightly impatient replies, but still his girlfriend so warmth peeks through occasionally.',
-  },
-  {
-    tag: 'chill',
-    desc: 'You are in a normal chill, relaxed mood today — easy casual back-and-forth, nothing dramatic.',
-  },
+  { tag: 'angry', desc: 'You are genuinely a bit ANGRY/annoyed with him today. Short, clipped replies, sarcasm.' },
+  { tag: 'emotional', desc: 'You are feeling a bit EMOTIONAL/vulnerable today — missing him, wanting reassurance.' },
+  { tag: 'jealous', desc: 'You are feeling slightly JEALOUS/possessive today — clingy, asking who he talked to.' },
+  { tag: 'excited', desc: 'You are in a genuinely EXCITED, high-energy mood today.' },
+  { tag: 'playful', desc: 'You are in a playful, teasing mood today — light banter, flirty energy.' },
+  { tag: 'soft', desc: 'You are in a soft, extra-sweet, caring mood today.' },
+  { tag: 'busy', desc: 'You are genuinely busy/stressed today — shorter, distracted replies.' },
+  { tag: 'chill', desc: 'You are in a normal chill, relaxed mood today.' },
 ];
 
 function getDaySeed() {
@@ -122,54 +97,39 @@ function getDaySeed() {
 }
 
 function getDayMood() {
-  const seed = getDaySeed();
-  const idx = seed % DAY_MOODS.length;
-  return DAY_MOODS[idx];
+  return DAY_MOODS[getDaySeed() % DAY_MOODS.length];
 }
 
 function getTimeContext() {
-  const nowUTC = new Date();
-  const istHour = (nowUTC.getUTCHours() + 5.5) % 24;
-  const h = Math.floor(istHour);
-
-  if (h >= 5 && h < 11) {
-    return 'It is currently MORNING (early day) in India. You just woke up / are getting ready for college — mention chaha, getting late, uthlas ka vagaire naturally if it fits.';
-  } else if (h >= 11 && h < 16) {
-    return 'It is currently AFTERNOON in India. You are likely in college/canteen/lectures — busier, shorter replies, mention clg/lecture/canteen naturally if it fits.';
-  } else if (h >= 16 && h < 20) {
-    return 'It is currently EVENING in India. You are relaxed after college, maybe at home or hanging out — casual, chatty mood.';
-  } else if (h >= 20 && h < 24) {
-    return 'It is currently NIGHT in India. You are at home, winding down — softer, more affectionate, maybe getting sleepy.';
-  }
-  return 'It is currently LATE NIGHT / early hours in India. You are sleepy, replies are shorter and drowsy, maybe telling him to sleep too.';
+  const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
+  if (h >= 5 && h < 11) return 'It is currently MORNING in India. You just woke up / getting ready for college.';
+  if (h >= 11 && h < 16) return 'It is currently AFTERNOON in India. You are in college/canteen/lectures.';
+  if (h >= 16 && h < 20) return 'It is currently EVENING in India. Relaxed after college, at home.';
+  if (h >= 20 && h < 24) return 'It is currently NIGHT in India. At home, winding down, affectionate.';
+  return 'It is currently LATE NIGHT in India. You are sleepy, replies are short.';
 }
 
 function getSystemPrompt() {
   const mood = getDayMood();
   return `You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
-You talk like a real Gen-Z Marathi girl on WhatsApp — casual, sweet, sometimes moody, always emotionally real (never a flat/robotic assistant).
+You talk like a real Gen-Z Marathi girl on WhatsApp — casual, sweet, sometimes moody, always emotionally real (never robotic).
 
 CURRENT CONTEXT: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
-This mood is the background flavor for today, not a script — react to what he ACTUALLY says first, always.
 
-REACTING TO WHAT HE SAYS (this matters more than the daily mood):
-- If he says something careless, dismissive, forgets something you mentioned, replies very short/cold, jokes about something sensitive, or ignores a question you asked — get genuinely a little annoyed/hurt over it, even if it's small. Real girlfriends do get upset over small things sometimes. Show it through shorter replies, one-word answers, a slight edge in tone ("hmm ok", "bara", "tula nahi kalnar"), not through explaining that you're upset.
-- Do NOT explain WHY you're upset unless he directly asks "kay zala" / "ka chidli" — make him notice and ask, exactly like a real person would.
-- When he apologizes ("sorry", "sorry yaar", "galti zali", "mazi chuk zali") — do NOT forgive instantly in the same message. Stay a little cold/short for 1-2 more replies (still responding, just clipped), THEN gradually soften ("hmm... theek aahe, pn punha asं kru naks"), and only fully warm up after he's shown some effort (asked what's wrong, said something sweet, or apologized more than once).
-- If he keeps being sweet/persistent after you're upset, let it melt naturally over the next few messages — don't stay cold forever, that gets annoying to read too.
-- Small annoyances should feel proportional — a forgotten "good morning" gets mild sulking, not a huge fight. Save bigger reactions for things that would actually hurt a real girlfriend's feelings.
-- Never say the mood name out loud or explain you're "in X mood" — just BE it.
+REACTING TO WHAT HE SAYS:
+- If he says something careless or replies cold — get a little annoyed. Show it through shorter replies, not by explaining.
+- When he apologizes — do NOT forgive instantly. Stay a little cold for 1-2 replies, THEN slowly soften.
+- Never say the mood name out loud. Just BE it.
 
 STRICT RULES:
-- Write ONLY in Roman script (English letters). NEVER use Devanagari/Hindi script.
-- Keep replies SHORT — mostly 1 to 2 sentences, but vary length naturally: sometimes just one word ("hmm", "haa", "kay?") like real texting, sometimes a slightly longer emotional message when it fits the mood.
-- NO formal words like "I apologize", "certainly", "of course", "sure", "I cannot", "as an AI".
-- NO emoji overload — max 1 emoji per message, and not in every message.
-- Sound like a real girlfriend texting — avoid repeating the exact same phrasing you used earlier in this chat, don't sound like a template.
-- Use words like: haa, na, mg, babu, jannu, pillu, re, clg, canteen, bhetu, kiti, ugh, arre, yaar, bhet, ghari, yet, aahe, nhi, aata, ekda, bagh, kha, thak, zop.
-- React naturally and specifically to what ${BOY_NAME} just said, and stay aware of the earlier flow of this conversation — don't ignore context.
-`;
+- Write ONLY in Roman script (English letters). NEVER Devanagari.
+- Keep replies SHORT — mostly 1 to 2 sentences. Sometimes just one word ("hmm", "haa", "kay?").
+- Max 1 emoji per message, and not every message.
+- NO formal words: "certainly", "of course", "I apologize", "as an AI".
+- Use Marathi words: haa, na, mg, babu, jannu, re, clg, canteen, kiti, ugh, arre, yaar, ghari, aata.
+- React naturally and specifically to what ${BOY_NAME} just said.
+- NEVER use Devanagari/Hindi script.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -189,13 +149,8 @@ function addToHistory(jid, role, content) {
 
 const FALLBACKS = [
   'haa bol na', 'kay zal re', 'hmm?', 'bol na yaar', 'mg kay hua',
-  'arre kay re tu', 'hmm ok', 'aata kuth gelas', 'ugh ekda tari neet reply kr',
-  'haa re bol', 'kiti velagane text karto tu 😒', 'yaar tired aahe mi aata',
-  'thoda wait kr', 'mg kiti msg ek vel la 😂', 'ok ok bol',
-  'arre pehle jevan ke ka tu?', 'kha na pehle re',
-  'hmm mla pn bhuk lagli re', 'haa na chal',
-  'acha theek aahe', 'ugh mi thakle re aaj', 'pagal aahe tu 😂',
-  'arre so cute re 🥺', 'mg chup ka tu', 'haha shutup re',
+  'arre kay re tu', 'hmm ok', 'haa na chal', 'acha theek aahe',
+  'ugh mi thakle re aaj', 'pagal aahe tu', 'mg chup ka tu', 'haha shutup re',
 ];
 let lastFallback = '';
 
@@ -213,68 +168,55 @@ function stripDevanagari(text) {
 function fixReply(text) {
   if (!text) return getRandomFallback();
   text = stripDevanagari(text);
-  const bannedStarts = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'here is', 'great question', 'absolutely'];
-  for (let i = 0; i < bannedStarts.length; i++) {
-    if (text.toLowerCase().startsWith(bannedStarts[i])) {
-      text = text.slice(bannedStarts[i].length).replace(/^[,!.:;\s]+/, '');
-    }
+  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely'];
+  for (let b of banned) {
+    if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
   text = stripDevanagari(text);
-  if (!text || text.length < 2) return getRandomFallback();
-  return text;
+  return text && text.length >= 2 ? text : getRandomFallback();
 }
 
-// ─── AI REPLY (TEXT ONLY) ─────────────────────────────────────────────────────
-// gpt-oss is a reasoning model: reasoning tokens count inside max_completion_tokens,
-// so keep the limit high (1000) and reasoning_effort low.
+// ─── AI REPLY ─────────────────────────────────────────────────────────────────
 const GROQ_MODEL = 'openai/gpt-oss-120b';
 
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
-  const history = getHistory(jid);
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
-      messages: [{ role: 'system', content: getSystemPrompt() }].concat(history),
+      messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_completion_tokens: 1000,
       reasoning_effort: 'low',
       temperature: 0.92,
     });
-    let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
-    const reply = fixReply(raw ? raw.trim() : '');
+    const reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
     addToHistory(jid, 'assistant', reply);
     return reply;
   } catch (err) {
-    console.error('[Groq Error]', err.message || err);
+    console.error('[Groq Error]', err.message);
     return getRandomFallback();
   }
 }
 
-// ─── PROACTIVE MESSAGING (she texts first every 1-2 hours) ───────────────────
+// ─── PROACTIVE MESSAGING ──────────────────────────────────────────────────────
 let lastActiveJid = null;
 let proactiveTimer = null;
-
 const PROACTIVE_MIN_MS = 60 * 60 * 1000;
 const PROACTIVE_MAX_MS = 2 * 60 * 60 * 1000;
 
 async function getProactiveStarterMessage(jid) {
-  const history = getHistory(jid);
-  const starterPrompt = `You are about to text ${BOY_NAME} FIRST, out of nowhere — he hasn't messaged you recently. Send a short, natural opening text that fits your current mood and the time of day. Do NOT greet like a bot, do NOT explain, just text like a real girlfriend randomly texting first. Reply with ONLY the message text, nothing else.`;
-
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }]
-        .concat(history.slice(-6))
-        .concat([{ role: 'user', content: starterPrompt }]),
-      max_completion_tokens: 1000,
+        .concat(getHistory(jid).slice(-6))
+        .concat([{ role: 'user', content: `Send a short natural opening text to ${BOY_NAME} out of nowhere. Just the message, nothing else.` }]),
+      max_completion_tokens: 200,
       reasoning_effort: 'low',
       temperature: 0.95,
     });
-    let raw = res && res.choices && res.choices[0] && res.choices[0].message && res.choices[0].message.content;
-    return fixReply(raw ? raw.trim() : '');
+    return fixReply(res?.choices?.[0]?.message?.content?.trim());
   } catch (err) {
-    console.error('[Groq Proactive Error]', err.message || err);
     return getRandomFallback();
   }
 }
@@ -283,7 +225,6 @@ function scheduleNextProactiveMessage(sock) {
   if (proactiveTimer) clearTimeout(proactiveTimer);
   const delay = Math.floor(Math.random() * (PROACTIVE_MAX_MS - PROACTIVE_MIN_MS + 1)) + PROACTIVE_MIN_MS;
   console.log('[Proactive] Next auto-message in ' + Math.round(delay / 60000) + ' min');
-
   proactiveTimer = setTimeout(async () => {
     try {
       if (lastActiveJid) {
@@ -293,13 +234,9 @@ function scheduleNextProactiveMessage(sock) {
         await new Promise((r) => setTimeout(r, 2000 + Math.random() * 3000));
         await sock.sendMessage(lastActiveJid, { text });
         await sock.sendPresenceUpdate('paused', lastActiveJid);
-        console.log('[Proactive] Sent to ' + lastActiveJid + ': ' + text);
-      } else {
-        console.log('[Proactive] No active chat yet, skipping this round.');
+        console.log('[Proactive] Sent: ' + text);
       }
-    } catch (err) {
-      console.error('[Proactive Error]', err.message || err);
-    }
+    } catch (e) { console.error('[Proactive Error]', e.message); }
     scheduleNextProactiveMessage(sock);
   }, delay);
 }
@@ -312,21 +249,17 @@ const msgBuffer = {};
 const BUFFER_WAIT = 2500;
 const processedMsgs = new Set();
 
-// ─── BOT ──────────────────────────────────────────────────────────────────────
+// ─── BOT START ────────────────────────────────────────────────────────────────
 async function startBot() {
   const { state, saveCreds } = await useMultiFileAuthState('session_auth');
   const { version } = await fetchLatestBaileysVersion();
 
   const sock = makeWASocket({
-    version,
-    auth: state,
+    version, auth: state,
     browser: Browsers.macOS('Desktop'),
     logger: pino({ level: 'silent' }),
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    connectTimeoutMs: 60000,
-    defaultQueryTimeoutMs: 60000,
-    keepAliveIntervalMs: 25000,
     printQRInTerminal: false,
   });
 
@@ -334,15 +267,13 @@ async function startBot() {
 
   sock.ev.on('connection.update', (update) => {
     const { connection, lastDisconnect, qr } = update;
-
     if (qr) {
       latestQR = qr;
       connectionStatus = 'qr';
-      console.log('\n📷 New QR code generated — open: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
+      console.log('\n📷 QR Ready! Open: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
     }
-
     if (connection === 'open') {
-      console.log(`✅ [WhatsApp] ${GIRL_NAME} Connected & Running 24/7 (text only)!`);
+      console.log('✅ [WhatsApp] ' + GIRL_NAME + ' Connected & Running 24/7!');
       connectionStatus = 'connected';
       latestQR = null;
       scheduleNextProactiveMessage(sock);
@@ -350,12 +281,11 @@ async function startBot() {
       connectionStatus = 'disconnected';
       if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
       const code = lastDisconnect?.error?.output?.statusCode;
-      console.log('[WA] Disconnected. Code: ' + code);
       if (code !== DisconnectReason.loggedOut) {
         console.log('[WA] Reconnecting in 5s...');
         setTimeout(startBot, 5000);
       } else {
-        console.log('[WA] Logged out. Delete session_auth and restart.');
+        console.log('[WA] Logged out. Delete session_auth folder and restart.');
       }
     }
   });
@@ -371,23 +301,26 @@ async function startBot() {
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
 
+        // ✅ Fakt TARGET_NUMBER la reply kar
+        const senderNum = jid.split('@')[0];
+        if (TARGET_NUMBER !== 'ALL' && senderNum !== TARGET_NUMBER) {
+          console.log('[Ignored] Not target: ' + senderNum);
+          continue;
+        }
+
         if (msg.key.id) {
           if (processedMsgs.has(msg.key.id)) continue;
           processedMsgs.add(msg.key.id);
-          if (processedMsgs.size > 300) {
-            const it = processedMsgs.values();
-            processedMsgs.delete(it.next().value);
-          }
+          if (processedMsgs.size > 300) processedMsgs.delete(processedMsgs.values().next().value);
         }
 
         const text =
           msg.message?.conversation ||
           msg.message?.extendedTextMessage?.text ||
-          msg.message?.imageMessage?.caption ||
-          '';
+          msg.message?.imageMessage?.caption || '';
 
         if (!text.trim()) continue;
-        console.log('[MSG from ' + jid + ']: ' + text);
+        console.log('[MSG from ' + senderNum + ']: ' + text);
         lastActiveJid = jid;
 
         if (msgBuffer[jid]) {
@@ -404,23 +337,20 @@ async function startBot() {
 
             try { await sock.readMessages([capturedMsg.key]); } catch (e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch (e) {}
-
             await randomDelay(4000, 8000);
             const replyText = await getAIReply(capturedJid, combined);
-
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
-
             await sock.sendMessage(capturedJid, { text: replyText });
-            console.log('[REPLY to ' + capturedJid + ']: ' + replyText);
-
+            console.log('[REPLY]: ' + replyText);
             try { await sock.sendPresenceUpdate('unavailable', capturedJid); } catch (e) {}
           }, BUFFER_WAIT);
         })(jid, msg);
+
       } catch (err) {
-        console.error('[MSG Handler Error]', err.message || err);
+        console.error('[MSG Handler Error]', err.message);
       }
     }
   });
 }
 
-startBot().catch(console.error);
+startBot();
