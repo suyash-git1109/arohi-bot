@@ -19,7 +19,9 @@ const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
-const TARGET_NUMBER = process.env.TARGET_NUMBER || '917083937742';
+
+// ✅ FAKT TULA REPLY - Tujha actual WhatsApp number
+const TARGET_NUMBER = '137473363550264';
 
 if (!GROQ_API_KEY) {
   console.error('[Config] GROQ_API_KEY missing! Add it in Render > Environment.');
@@ -301,9 +303,9 @@ async function startBot() {
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
 
-        // ✅ Fakt TARGET_NUMBER la reply kar
+        // ✅ FAKT TULA REPLY - Baaki saglyana ignore
         const senderNum = jid.split('@')[0];
-        if (TARGET_NUMBER !== 'ALL' && senderNum !== TARGET_NUMBER) {
+        if (senderNum !== TARGET_NUMBER) {
           console.log('[Ignored] Not target: ' + senderNum);
           continue;
         }
@@ -320,7 +322,7 @@ async function startBot() {
           msg.message?.imageMessage?.caption || '';
 
         if (!text.trim()) continue;
-        console.log('[MSG from ' + senderNum + ']: ' + text);
+        console.log('[MSG from Suyash]: ' + text);
         lastActiveJid = jid;
 
         if (msgBuffer[jid]) {
@@ -341,7 +343,7 @@ async function startBot() {
             const replyText = await getAIReply(capturedJid, combined);
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
             await sock.sendMessage(capturedJid, { text: replyText });
-            console.log('[REPLY]: ' + replyText);
+            console.log('[REPLY to Suyash]: ' + replyText);
             try { await sock.sendPresenceUpdate('unavailable', capturedJid); } catch (e) {}
           }, BUFFER_WAIT);
         })(jid, msg);
