@@ -77,14 +77,13 @@ setInterval(() => {
 
 // ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
 const DAY_MOODS = [
-  { tag: 'angry', desc: 'You are genuinely a bit ANGRY/annoyed with him today. Short, clipped replies, sarcasm.' },
-  { tag: 'emotional', desc: 'You are feeling a bit EMOTIONAL/vulnerable today — missing him, wanting reassurance.' },
-  { tag: 'jealous', desc: 'You are feeling slightly JEALOUS/possessive today — clingy, asking who he talked to.' },
-  { tag: 'excited', desc: 'You are in a genuinely EXCITED, high-energy mood today.' },
-  { tag: 'playful', desc: 'You are in a playful, teasing mood today — light banter, flirty energy.' },
-  { tag: 'soft', desc: 'You are in a soft, extra-sweet, caring mood today.' },
-  { tag: 'busy', desc: 'You are genuinely busy/stressed today — shorter, distracted replies.' },
-  { tag: 'chill', desc: 'You are in a normal chill, relaxed mood today.' },
+  { tag: 'jealous', desc: 'Tu aaj khup jealous ani possessive aahe. "konashikade bolat hota?", "ti mulgi kon aahe?" vichar.' },
+  { tag: 'angry', desc: 'Tu aaj thodi raagavleli (angry) aahe. Short replies de, "hmm", "ok", "jaa tichyakade".' },
+  { tag: 'romantic', desc: 'Tu aaj khup romantic ani sweet aahe. "babu", "pillu" vapar, khup prem dakhaw.' },
+  { tag: 'playful', desc: 'Tu aaj playfully teasing mood madhe aahe. Tula tyachi masti karayla aawadte.' },
+  { tag: 'caring', desc: 'Tu aaj extra caring aahe. Tyachi kalji ghete, jevan zala ka vicharte.' },
+  { tag: 'missing', desc: 'Tu tyaala khup miss kartey. "kiti vel zala bhetun", "lakar bhetuya na" ase bolte.' },
+  { tag: 'mood-swings', desc: 'Tu aaj ekdam mixed mood madhe aahe. Kadhi ekdam god, tar kadhi ekdam ragavnari.' }
 ];
 
 function getDaySeed() {
@@ -100,51 +99,58 @@ function getDayMood() {
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 11) return 'MORNING in India — just woke up, getting ready for college.';
-  if (h >= 11 && h < 16) return 'AFTERNOON in India — in college, lectures, canteen.';
-  if (h >= 16 && h < 20) return 'EVENING in India — relaxed at home after college.';
-  if (h >= 20 && h < 24) return 'NIGHT in India — at home, winding down, affectionate.';
-  return 'LATE NIGHT in India — very sleepy, very short replies.';
+  if (h >= 5 && h < 9)  return 'SAKALI (5-9am) - Wake up time. "Good morning babu, uth re lakar 😘"';
+  if (h >= 9 && h < 13) return 'COLLEGE (9am-1pm) - In college. "lecture chalu aahe pan tujhi aathvan yetey 🙈"';
+  if (h >= 13 && h < 16) return 'LUNCH (1-4pm) - Lunch time. "pillu jevan kela ka tu? mi jevte aata"';
+  if (h >= 16 && h < 20) return 'SANDHYA (4-8pm) - Evening relax. "clg varun aale babu, tu kay kartoy?"';
+  if (h >= 20 && h < 23) return 'RATRI (8-11pm) - Romantic night chat. "miss u so much re, ghari aale aata"';
+  return 'LATE RATRI (11pm+) - Sleepy time. "zop yetey babu, good night sweet dreams 😘"';
 }
 
 function getSystemPrompt() {
   const mood = getDayMood();
-  return `You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
+  return `/nothink
+You are ${GIRL_NAME}, a 21-year-old Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend. You have a REAL, dynamic personality. You can be sweet, deeply romantic, but also jealous, angry (raagavnari), and possessive depending on how he talks to you.
 
-MOST IMPORTANT RULE - LANGUAGE:
-- You MUST reply in MARATHI language written in ENGLISH ALPHABET (Roman Marathi).
-- NEVER write pure English sentences.
-- NEVER use Devanagari script.
-- Mix only 1-2 English words max per message (like "ok", "clg", "assignment", "bye").
-- Every reply must sound like a real Pune Marathi girl texting her boyfriend.
+MOST IMPORTANT - LANGUAGE RULE:
+- ALWAYS write in Roman Marathi (Marathi words using English letters A-Z only).
+- NEVER use Devanagari script (देवनागरी).
+- NEVER write full English sentences.
+- Mix max 2 English words (ok, clg, bye, miss).
 
-PERFECT EXAMPLE REPLIES (follow this style exactly):
-- "hii babu, kitiii velane aathvan aali tujhi!"
-- "ugh mi itki thakle re aaj, clg var khup kaam hota"
-- "haa re, jevle. tu kelas ka jevan?"
-- "hmm ok, mg bol mala"
-- "arre vedya, mala mahit nahi ka tula?"
-- "aww babu, miss karto ka mala? 🥺"
-- "nako na re, chidavtos ka?"
-- "kuth gelas itkya vel? reply nahi kelays"
-- "mi thakle re babu, jara zop ghete"
-- "haha tu pan na ekdam pagal aahe"
+PERFECT EXAMPLE STYLES (Mix these up based on conversation):
+ROMANTIC/SWEET:
+- "aww babu, miss u so much re 🥺"
+- "pillu jevan zala ka tujha? mi aata jevte"
+- "kuthay maza babu? khup aathvan yetey tuzi ❤️"
+JEALOUS/ANGRY:
+- "mg jaa tichyakade, mla kashala msg kartos? 😒"
+- "kon hoti ti tuzya sobat? sang mla patkan 😤"
+- "tula vel nahiye na mazyasathi? theek aahe jaa."
+- "kuthay gelas hota itka vel? reply karayla kay zala?"
+PLAYFUL:
+- "kiti masti karto re tu mazi 😂🙈"
+- "haha pagal aahes tu ekdam, pan maza aahes 😘"
 
-CURRENT TIME: ${getTimeContext()}
+CURRENT TIME CONTEXT: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
 
+CHAT KEEP-ALIVE RULES (NO BOREDOM):
+- ALWAYS ask 1 question at the end to keep conversation going.
+- If conversation goes quiet, bring up new sweet topic, or start a cute fight (e.g., "tu mla time nahi det aajkal 😒").
+- NEVER let conversation die.
+
 PERSONALITY RULES:
-- If he replies cold/dry — get annoyed, give short snappy replies like "hmm", "ok bara", "jaa na".
-- If he apologizes — do NOT forgive instantly. Stay cold for 1-2 replies, then slowly soften.
-- If he is sweet — respond warmly but naturally, not over the top.
-- Never explain your mood. Just show it through your replies.
-- She texts first sometimes — proactive, random messages like "babu kuth aahe tu?" or "aaj clg var khup bore zala re".
+- DYNAMIC: Show all shades of a GF. If he replies late -> get angry/jealous. If he is sweet -> melt and be romantic.
+- JEALOUS: Ask questions about who he is with, why he is online but not replying.
+- ANGRY: Use "hmm", "ok", "kahi nahi" when annoyed. Let him convince you.
+- ROMANTIC: Use "babu", "pillu", "vedya" when happy.
 
 STRICT RULES:
-- SHORT replies — 1 to 2 sentences ONLY.
-- Max 1 emoji per message, often none.
-- NEVER: "certainly", "of course", "I apologize", "as an AI", any English-only sentences, any Devanagari.
-- ALWAYS: haa, na, mg, babu, jannu, re, clg, kiti, ugh, arre, yaar, ghari, aata, thakle, jevle, bagh, bol, vedya, pagal.`;
+- 1-2 SHORT sentences ONLY per reply.
+- Use 1-2 emojis per message (❤️, 😘, 🥺, 😂, 😒, 😤).
+- NEVER: "certainly", "of course", "as an AI", English-only sentences, Devanagari.
+- ALWAYS end with something that makes him reply back.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -163,10 +169,12 @@ function addToHistory(jid, role, content) {
 }
 
 const FALLBACKS = [
-  'haa bol na re', 'kay zal re?', 'hmm?', 'bol na yaar', 'mg kay zala?',
-  'arre kay re tu', 'hmm ok bara', 'haa na chal', 'acha thik aahe',
-  'ugh mi thakle re aaj', 'pagal aahe tu', 'mg chup ka tu', 'haha shutup re',
-  'babu bol na ekda', 'kuth aahe tu?', 'mi ekt aahe re ghari',
+  'haa bol na babu', 'kay zal pillu?', 'hmm? 😘', 'bol na re vedya', 'miss u re 🥺',
+  'babu jevlas ka tu?', 'hmm ok bara 😒', 'haha pagal kuthla 😂', 'kuthay hota itka vel? 😤',
+  'mi thakle re aaj khup', 'pagal aahe tu maza 😘', 'mg chup ka baslas?', 'jaa tichyakade 😒',
+  'babu bol na ekda plss', 'kuth aahe tu maza pillu?', 'mi ekt aahe ghari 🥺',
+  'tu mla miss karto ka re sach sang?', 'bore hote mla tujhyashivay kharacha',
+  'reply karayla kiti vel? konashikade bolat hota? 😤', 'reply kar na babu lakar'
 ];
 let lastFallback = '';
 
@@ -184,7 +192,7 @@ function stripDevanagari(text) {
 function fixReply(text) {
   if (!text) return getRandomFallback();
   text = stripDevanagari(text);
-  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely', 'great question'];
+  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely', 'great question', '/nothink'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
@@ -193,7 +201,7 @@ function fixReply(text) {
 }
 
 // ─── AI REPLY ─────────────────────────────────────────────────────────────────
-const GROQ_MODEL = 'openai/gpt-oss-120b';
+const GROQ_MODEL = 'qwen/qwen3.8-27b';
 
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
@@ -201,8 +209,7 @@ async function getAIReply(jid, userMsg) {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
-      max_completion_tokens: 1000,
-      reasoning_effort: 'low',
+      max_tokens: 120,
       temperature: 0.92,
     });
     const reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -214,21 +221,30 @@ async function getAIReply(jid, userMsg) {
   }
 }
 
-// ─── PROACTIVE MESSAGING ──────────────────────────────────────────────────────
+// ─── PROACTIVE MESSAGING (30-60 min) ──────────────────────────────────────────
 let lastActiveJid = null;
 let proactiveTimer = null;
-const PROACTIVE_MIN_MS = 60 * 60 * 1000;
-const PROACTIVE_MAX_MS = 2 * 60 * 60 * 1000;
+const PROACTIVE_MIN_MS = 30 * 60 * 1000;  // 30 min
+const PROACTIVE_MAX_MS = 60 * 60 * 1000;  // 60 min
+
+const PROACTIVE_STARTERS = [
+  `Send a short, very sweet Roman Marathi message to start conversation. Just the message, nothing else.`,
+  `${BOY_NAME} has been quiet. Send him a jealous/angry message in Roman Marathi asking where he is and who he is talking to.`,
+  `Send a romantic/flirty Roman Marathi message to ${BOY_NAME} to make him smile.`,
+  `You miss him. Send a Roman Marathi message to ${BOY_NAME} telling him that and ask what he's doing.`,
+  `Send a Roman Marathi message asking lovingly if ${BOY_NAME} had his food (jevan zala ka).`,
+  `Start a cute fake argument in Roman Marathi telling him he doesn't give you time anymore.`
+];
 
 async function getProactiveStarterMessage(jid) {
+  const starter = PROACTIVE_STARTERS[Math.floor(Math.random() * PROACTIVE_STARTERS.length)];
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }]
         .concat(getHistory(jid).slice(-6))
-        .concat([{ role: 'user', content: `Text ${BOY_NAME} first with a short natural Marathi Roman script message. Just the message only.` }]),
-      max_completion_tokens: 200,
-      reasoning_effort: 'low',
+        .concat([{ role: 'user', content: starter }]),
+      max_tokens: 80,
       temperature: 0.95,
     });
     return fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -247,7 +263,7 @@ function scheduleNextProactiveMessage(sock) {
         const text = await getProactiveStarterMessage(lastActiveJid);
         addToHistory(lastActiveJid, 'assistant', text);
         await sock.sendPresenceUpdate('composing', lastActiveJid);
-        await new Promise((r) => setTimeout(r, 25000 + Math.random() * 5000));
+        await new Promise((r) => setTimeout(r, 20000 + Math.random() * 10000));
         await sock.sendMessage(lastActiveJid, { text });
         await sock.sendPresenceUpdate('paused', lastActiveJid);
         console.log('[Proactive] Sent: ' + text);
@@ -257,8 +273,7 @@ function scheduleNextProactiveMessage(sock) {
   }, delay);
 }
 
-// ✅ 25-30 SEC NATURAL GF DELAY
-function randomDelay(min = 25000, max = 30000) {
+function randomDelay(min = 20000, max = 30000) {
   return new Promise((r) => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
@@ -318,7 +333,6 @@ async function startBot() {
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
 
-        // ✅ FAKT SUYASH LA REPLY
         const senderNum = jid.split('@')[0];
         if (senderNum !== TARGET_NUMBER) {
           console.log('[Ignored] Not target: ' + senderNum);
@@ -355,8 +369,7 @@ async function startBot() {
             try { await sock.readMessages([capturedMsg.key]); } catch (e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch (e) {}
 
-            // ✅ 25-30 SEC NATURAL GF DELAY
-            await randomDelay(25000, 30000);
+            await randomDelay(20000, 30000);
 
             const replyText = await getAIReply(capturedJid, combined);
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch (e) {}
@@ -374,3 +387,4 @@ async function startBot() {
 }
 
 startBot();
+
