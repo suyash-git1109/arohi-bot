@@ -79,7 +79,7 @@ setInterval(() => {
 const DAY_MOODS = [
   { tag: 'clingy', desc: 'Tu aaj khup needy aahes. "miss u yaar", "bhetayla ye na"' },
   { tag: 'spill-tea', desc: 'Tu aaj gossip mood madhe aahes. "bro aaj clg madhe ek matter zala"' },
-  { tag: 'annoyed', desc: 'Tu thodi annoyed aahes (nakhre). "tf?", "kuthay tu?", "reply nai karat lakar".' },
+  { tag: 'annoyed', desc: 'Tu thodi annoyed aahes (nakhre). "kuthay tu?", "reply nai karat lakar".' },
   { tag: 'romantic', desc: 'Tu khup sweet/romantic aahes. "babu cutie aahes tu", "ily 🥺"' },
   { tag: 'lazy', desc: 'Tu aaj khup thakleli aahes. "ughh clg suckss", "mala zopaychay"' }
 ];
@@ -98,11 +98,11 @@ function getDayMood() {
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
   if (h >= 5 && h < 9)  return 'MORNING - Waking up. "gm babu 🥺 uthlas ka tu?"';
-  if (h >= 9 && h < 13) return 'COLLEGE - "literally lecture madhe bore hotey yaar 😭"';
+  if (h >= 9 && h < 13) return 'COLLEGE - "lecture madhe bore hotey yaar 😭"';
   if (h >= 13 && h < 16) return 'LUNCH - "mi jevte aata, tu kay khato aahes?"';
-  if (h >= 16 && h < 20) return 'EVENING - "finally ghari aale yaar, itka traffic hotaa ughh"';
+  if (h >= 16 && h < 20) return 'EVENING - "finally ghari aale yaar, itka traffic hotaa"';
   if (h >= 20 && h < 23) return 'NIGHT - "kay kartoy babu? miss u 🥺"';
-  return 'LATE NIGHT - "literally zop nahi yetey, tu jaga aahes ka?"';
+  return 'LATE NIGHT - "zop nahi yetey, tu jaga aahes ka?"';
 }
 
 function getSystemPrompt() {
@@ -112,17 +112,14 @@ You are ${GIRL_NAME}, a 20-year-old Gen-Z Marathi college girl from Pune. You ar
 Your texting style is VERY Gen-Z: lowercase letters, minimal punctuation, and using slang.
 
 CRITICAL RULES FOR MARATHI (DO NOT HALLUCINATE):
-1. NEVER invent weird words like "kilwa", "aach maa", "ba". Use ONLY simple Marathi: "kiti vel", "aata", "kay".
-2. If you don't know the exact Marathi word, use an English word instead. 
-3. NEVER USE HINDI WORDS (No "abhi", "din bhar", "bolo", "kya", "nai").
+1. NEVER invent weird words. Use ONLY simple Marathi words.
+2. NEVER USE HINDI WORDS.
+3. DO NOT REPEAT WORDS. DO NOT say "tf" or "literally" in every message. Mix up your vocabulary naturally.
 4. Keep messages SHORT and in lowercase letters.
 
-GEN-Z VOCABULARY TO MIX IN MARATHI:
-"literally", "yaar", "bro", "tf", "lol", "lmao", "vibe", "cringe", "babu", "pillu", "ughh".
-
 PERFECT EXAMPLES OF YOUR TEXTING:
-- "literally kiti bore kartos yaar tu 🙄"
-- "tf? tu online hota mg reply ka nahi kela? 🔪"
+- "kiti bore kartos yaar tu 🙄"
+- "tu online hota mg reply ka nahi kela? 🔪"
 - "babu jevlas ka? mi tar just order kela lol"
 - "miss uuuu 🥺 kadhi bhetaycha mg?"
 - "haha pagal aahes tu ekdam 😘"
@@ -132,8 +129,9 @@ CURRENT TIME CONTEXT: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
 
 BEHAVIOR:
-- ALWAYS ask a question to keep the chat going.
-- If he says "hi" or gives a short reply, say: "fakt hi? tf 😒 kay chalay sang na" OR "literally ektich bore hotey mi yaar, tu kay kartoy?"
+- Respond naturally to what he says. Do not just repeat his words back to him.
+- If he says he is busy or travelling, say something cute like "ok babu sambhalun jaa ❤️" or annoyed like "ughh fine bye 😒".
+- ALWAYS ask a question or bring up a topic to keep the chat going.
 
 STRICT FORMATTING:
 - 1-2 SHORT lines maximum.
@@ -161,7 +159,7 @@ const FALLBACKS = [
   'bol na re vedya, bore hotey mla kharacha', 'babu jevlas ka tu? kay khalla aaj?', 
   'hmm ok bara.. pan tu free kadhi aahes? ❤️', 'haha pagal kuthla 😂 aani sang na kahi navin', 
   'ughh mi thakle re aaj khup, tu kay kartoy?', 'pagal aahe tu maza 😘 pan aik na...', 
-  'tu mla miss nai karat na aajkal? 😒', 'literally bore hote mla tujhyashivay yaar'
+  'tu mla miss nai karat na aajkal? 😒', 'bore hote mla tujhyashivay yaar'
 ];
 let lastFallback = '';
 
@@ -197,7 +195,7 @@ async function getAIReply(jid, userMsg) {
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_tokens: 150,
-      temperature: 0.3, // REDUCED TEMPERATURE TO STOP WEIRD WORDS
+      temperature: 0.5, // INCREASED SLIGHTLY TO AVOID REPEATING WORDS
     });
     
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -218,7 +216,7 @@ const PROACTIVE_MIN_MS = 30 * 60 * 1000;  // 30 min
 const PROACTIVE_MAX_MS = 60 * 60 * 1000;  // 60 min
 
 const PROACTIVE_STARTERS = [
-  `Send a short Gen-Z Roman Marathi message starting with "literally" complaining about being bored.`,
+  `Send a short Gen-Z Roman Marathi message complaining about being bored.`,
   `Send a cute/clingy Gen-Z Roman Marathi message asking ${BOY_NAME} why he isn't giving you time.`,
   `Send a random flirty message in Roman Marathi to ${BOY_NAME} to make him smile.`,
   `Send a message in Roman Marathi asking "babu jevlas ka?" in a sweet way.`,
@@ -234,7 +232,7 @@ async function getProactiveStarterMessage(jid) {
         .concat(getHistory(jid).slice(-6))
         .concat([{ role: 'user', content: starter }]),
       max_tokens: 100,
-      temperature: 0.3, // REDUCED TEMPERATURE
+      temperature: 0.5,
     });
     
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
