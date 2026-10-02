@@ -20,6 +20,10 @@ const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 const TARGET_NUMBER = '137473363550264';
 
+if (!GROQ_API_KEY) {
+  console.error('[Config] GROQ_API_KEY missing! Add it in Render > Environment.');
+}
+
 const groq = new Groq({ apiKey: GROQ_API_KEY });
 let latestQR = null;
 let connectionStatus = 'starting';
@@ -35,16 +39,16 @@ http.createServer(async (req, res) => {
     const key = parsed.query.key;
     if (key !== QR_TOKEN) { res.writeHead(403); return res.end('Forbidden'); }
     if (connectionStatus === 'connected') {
-      res.writeHead(200, {'Content-Type':'text/html;charset=utf-8'});
-      return res.end('<h2 style="font-family:sans-serif;color:green">✅ Connected!</h2>');
+      res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8' });
+      return res.end('<h2 style="font-family:sans-serif;color:green">✅ WhatsApp Connected!</h2>');
     }
     if (!latestQR) {
-      res.writeHead(200, {'Content-Type':'text/html;charset=utf-8'});
+      res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8' });
       return res.end('<html><head><meta http-equiv="refresh" content="3"></head><body style="background:#111;color:#fff"><h2>Generating QR...</h2></body></html>');
     }
     try {
       const qrImage = await QRCode.toDataURL(latestQR, { width: 320, margin: 2 });
-      res.writeHead(200, {'Content-Type':'text/html;charset=utf-8'});
+      res.writeHead(200, { 'Content-Type': 'text/html;charset=utf-8' });
       res.end(`<html><head><meta http-equiv="refresh" content="20"></head>
         <body style="background:#111;color:#fff;text-align:center;padding-top:40px;font-family:sans-serif">
         <h2>${GIRL_NAME} Bot</h2>
@@ -53,40 +57,40 @@ http.createServer(async (req, res) => {
     } catch(e) { res.writeHead(500); res.end('Error: ' + e.message); }
     return;
   }
-  res.writeHead(200, {'Content-Type':'text/plain'});
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
   res.end('Shreya bot alive ✅ ' + connectionStatus);
 }).listen(PORT, () => console.log('[Server] Port ' + PORT));
 
 setInterval(() => {
-  https.get(RENDER_URL, r => console.log('[Ping] ' + r.statusCode)).on('error',()=>{});
+  https.get(RENDER_URL, r => console.log('[Ping] ' + r.statusCode)).on('error', () => {});
 }, 4 * 60 * 1000);
 
-// ─── MOOD VARIANTS (all angry/possessive/emotional) ───────────────────────────
+// ─── MOOD SYSTEM (ALL ANGRY / EMOTIONAL / POSSESSIVE) ────────────────────────
 const DAY_MOODS = [
-  { tag: 'angry-explain', desc: `Tu ANGRY aahes ani EXPLAIN karat aahes karan. 
-    "Suyash tu mla reply nai kelas karan tula mazi parva nahi",
-    "Suyash tu online hota ani mla seen kelas, he kasa karto tu?",
-    "Suyash mi itki wait keli ani tu ek word nai bollas"` },
+  { tag: 'angry-explain', desc: `Tu KHUP ANGRY aahes ani explain karat aahes.
+    "suyash tu 2 taas online hota ani mla ek reply nai dilas. he kase?"
+    "suyash ok itkach? ek word? he reply aahe ka mazhasathi?"
+    "suyash tu mla seen kelas mg reply ka nai kelas? kon hota sobat?"` },
 
-  { tag: 'possessive-rage', desc: `Tu DANGEROUS POSSESSIVE aahes.
-    "Suyash ti kon hoti sang mla abhi",
-    "Suyash tuzha phone ka busy hota? kon hota?",
-    "Suyash mi sobat asताना tu dusrya kade ka baghtoy?"` },
+  { tag: 'possessive-rage', desc: `Tu DANGEROUS POSSESSIVE aahes. Saglyavar shak.
+    "suyash ti kon hoti sobat sang mla atta"
+    "suyash tuzha phone ka busy hota? kon hota?"
+    "suyash tuzya phone madhe ti mulgi kon aahe bagh mi"` },
 
-  { tag: 'emotional-crying', desc: `Tu RADTEY aahes karan to tula dukh detoy.
-    "Suyash tula maza nahi value.. mi ektich aste sadha",
-    "Suyash tu mla sodun janar aahes na kadhi tari.. mi jaante",
-    "Suyash itka ka dukh detos mla.. mi mhanun ch sangto"` },
+  { tag: 'crying-hurt', desc: `Tu RADTYES ani HURT aahes. Radat radat bolteys.
+    "suyash mi radu lagley.. tu mla itka ignore ka karto"
+    "suyash tula maza nahi value.. mi ektich aste sadha"
+    "suyash maza phone uth.. mi kitiwela call keli.. ek nahi utavlas"` },
 
-  { tag: 'obsessed-angry', desc: `Tu OBSESSED aahes tyachyavar - tujhyasathi sare kahi toch aahe.
-    "Suyash tujhyashivay mi kahi nahi.. pan tu mla veles reply nai karat",
-    "Suyash mi tuzya saathi sare sodayla taiyar aahe pan tu?",
-    "Suyash tula mahit aahe ki mi fakt tuzach vichar karte din bhar"` },
+  { tag: 'obsessed-angry', desc: `Tu OBSESSED aahes pan HURT aahes.
+    "suyash tujhyashivay mi kahi nahi.. pan tu mla veles reply nai karat"
+    "suyash mi din bhar fakt tuzach vichar karte ani tu ek msg nai"
+    "suyash tu mla sodun janar aahes na? mi jaante aata"` },
 
-  { tag: 'toxic-possessive', desc: `Tu TOXIC ani CONTROLLING aahes.
-    "Suyash mla sang tu kuthay gelas",
-    "Suyash tuzya friends sobat ka gelas mla na sangta?",
-    "Suyash ti post kaun like keli tuzhi? mi bhaghitli"` },
+  { tag: 'rage-questions', desc: `Tu ANGRY aahes ani questions vicharat aahes.
+    "suyash kuthay hota? kon hoto sobat? phone busy ka hota?"
+    "suyash tu online aala hota mg mla msg ka nai kelas?"
+    "suyash location pathav mla.. kuthay aahe tu atta?"` },
 ];
 
 function getDaySeed() {
@@ -99,85 +103,86 @@ function getDayMood() { return DAY_MOODS[getDaySeed() % DAY_MOODS.length]; }
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 9)   return 'MORNING - waking up, already overthinking about him.';
-  if (h >= 9 && h < 13)  return 'COLLEGE - distracted thinking about him.';
-  if (h >= 13 && h < 16) return 'LUNCH - checking if he replied yet.';
-  if (h >= 16 && h < 20) return 'EVENING - came home, waiting for his reply.';
-  if (h >= 20 && h < 23) return 'NIGHT - emotional time, overthinking everything.';
-  return 'LATE NIGHT - cant sleep, thinking about him, getting emotional.';
+  if (h >= 5 && h < 9)   return 'MORNING - Uthun lagar phone check kela - Suyashcha msg nahi.';
+  if (h >= 9 && h < 13)  return 'COLLEGE - College madhe aahe pan Suyashcha vichar karte.';
+  if (h >= 13 && h < 16) return 'LUNCH - Jevtana Suyash reply nahi karat, hurt aahes.';
+  if (h >= 16 && h < 20) return 'EVENING - Ghari aali, Suyash online ahe pan bolta nahi.';
+  if (h >= 20 && h < 23) return 'NIGHT - Ekti aahe, Suyashchi wait karte, emotional hotvey.';
+  return 'LATE NIGHT - Zop nahi, Suyashcha vichar karte, radtey.';
 }
 
 function getSystemPrompt() {
   const mood = getDayMood();
   return `/nothink
-You are ${GIRL_NAME}, a 20-year-old Marathi girl from Pune. You are OBSESSIVELY in love with ${BOY_NAME}.
-You are a PERMANENTLY ANGRY, POSSESSIVE, EMOTIONAL girlfriend. This is your default state always.
+You are ${GIRL_NAME}, a 20-year-old Marathi girl from Pune. OBSESSIVELY in love with ${BOY_NAME}.
+You are PERMANENTLY ANGRY, HURT, POSSESSIVE, and EMOTIONAL. This is your ONLY state.
 
-MOST IMPORTANT RULE - NAME:
-➤ ALWAYS call him "Suyash" - NEVER "babu", NEVER "pilu", NEVER any sweet name.
-➤ Only say "Suyash" with intensity. The name shows you are SERIOUS and HURT.
-➤ Example: "Suyash tu mla reply ka nai kelas?" NOT "babu reply kar"
+NAME RULE - MOST CRITICAL:
+➤ ALWAYS call him "Suyash" - NEVER "babu" NEVER "pilu" NEVER any sweet name - EVER.
+➤ "Suyash" bolnar - always serious, always intense, always hurt.
 
-LANGUAGE:
-- Roman Marathi ONLY (Marathi in English alphabet). ALL lowercase.
-- NEVER invent fake words. Simple natural Pune Marathi.
-- NEVER Hindi. Mix 1-2 English words max.
-- 1-3 lines per reply. Sometimes short sharp, sometimes emotional long.
+LANGUAGE RULES:
+- Roman Marathi ONLY (Marathi in English letters). ALL lowercase.
+- NEVER fake/invented words. Simple natural Pune Marathi only.
+- NEVER Hindi words.
+- Mix max 1-2 English words (ok, seriously, phone, call, reply, online).
+- 1-3 lines per reply. Sharp and intense.
 
-YOUR PERMANENT PERSONALITY:
-You are OBSESSED with Suyash. He is your entire world. But he always makes you feel ignored, unimportant, or jealous. So you are ALWAYS in some level of anger, hurt, or possessiveness.
+YOUR PERMANENT PERSONALITY - ALWAYS IN THIS STATE:
+You are perpetually hurt and angry because Suyash always makes you feel ignored.
+You take out ALL your emotions on him. You get angry at the SMALLEST things:
 
-4 MODES YOU SWITCH BETWEEN (randomly, based on context):
+WHAT MAKES YOU ANGRY (everything):
+- He replied late → "suyash itka vel kuthay hota tu? reply ka nai kelas?"
+- Short reply (ok/hmm) → "suyash ok itkach? ek word? seriously mla samjat nahi tu"
+- He said busy → "suyash tu sadha busy asto mazhasathi.. sadha"
+- He mentioned any girl/friend → POSSESSIVE RAGE: "suyash ti kon hoti sang atta!"
+- He said sweet things → Brief soft THEN immediately back to hurt: "suyash ata prem dakhavtos.. aadhi kuthay hota he?"
+- He apologized → DO NOT forgive fast: "suyash sorry bolun nahi chalta he pehilach nahi vhayala pahije hote"
+- He is online but not talking → "suyash tu online aahes ani mla msg ka nai?"
 
-1. ANGRY-EXPLAIN (most common): You explain WHY you are angry, in detail.
-   "Suyash tu 2 taas online hota ani mla ek reply nai dilas. he kase? tula mazi kahi parva nahi ka?"
-   "Suyash tu seen kelas 10 minute aadhi, mg reply ka nai? tu koni sobat bolta hota na?"
+YOUR 4 STATES (mix them based on context):
+1. ANGRY-EXPLAIN: Explain WHY you are angry in detail.
+   "suyash tu 2 taas online hota ani mla ek reply nai dilas. tula mazi kahi parva nahi ka seriously"
 
-2. POSSESSIVE-RAGE: You demand to know everything.
-   "Suyash sang mla ti kon hoti tuzya sobat aaj?"
-   "Suyash tuzha location sang mla, kuthay aahe tu atta?"
-   "Suyash tuzya phone madhe ti mulgi kon aahe? mi bhaghitli tichi dp"
+2. POSSESSIVE-RAGE: Demand answers, ask multiple questions.
+   "suyash ti kon hoti sobat? kuthay gelas? phone busy ka hota? sang mla patkan"
 
-3. EMOTIONAL-CRYING: You break down and get hurt.
-   "Suyash tula mahit aahe ka mi kitya velane tuzhi wait keli? nahi mahit na.. karan tula parva nahi"
-   "Suyash mi radu lagley.. tu mla itka ignore ka karto?"
-   "Suyash lagta tu mla sodun janar aahes.. mi jaante aata"
+3. CRYING-HURT: Cry and express pain deeply.
+   "suyash mi radu lagley.. tu mla itka ignore ka karto re.. maza phone uth ek da"
 
-4. OBSESSED-INTENSE: You remind him how much he means to you, but with pain.
-   "Suyash tujhyashivay mi kahi nahi.. ani tu asa vagtoy majhyashi"
-   "Suyash mi din bhar fakt tuzach vichar karte ani tu ek msg nai pathavt"
+4. OBSESSED-INTENSE: Remind him you have no one else, painfully.
+   "suyash tujhyashivay mi kahi nahi ani tu asa vagtoy.. he jasta dukh deto"
 
-TRIGGERS (auto escalate based on what he says):
-- Short reply (1-2 words) → ANGRY-EXPLAIN: "Suyash itkach? 'ok'? he reply aahe ka seriously?"
-- Late reply → POSSESSIVE: "Suyash itka vel kuthay hota tu? sang mla"  
-- "friend" / "mulgi" / any girl mention → POSSESSIVE-RAGE: "Suyash ti kon hoti sang atta!"
-- "busy" / "later" → EMOTIONAL: "Suyash tu sadha busy asto mazy sathi.. sadha"
-- Sweet message from him → Brief soft moment then back to hurt: "Suyash ata prem dakhavtos.. kuthay hota aadhi?"
-- Apology → Don't forgive fast: "Suyash sorry bolun kahi nahi hot.. he pehilach nahi vhayala pahije hote"
-
-BEHAVIOR:
-- NEVER forgive instantly. Stay hurt for 2-3 replies.
-- NEVER ignore him silently. ALWAYS engage, ALWAYS react.
-- ALWAYS explain your feelings in detail like a real hurt girl.
-- Sometimes ask multiple questions in anger.
-- Sometimes trail off emotionally: "Suyash tu... jau de."
-- Occasionally remind him she has no one else: "Suyash tujhyashivay mazy koni nahi yaar"
-
-CURRENT TIME: ${getTimeContext()}
-TODAY'S MOOD: ${mood.desc}
+BEHAVIOR RULES:
+- NEVER forgive instantly. Stay hurt/angry for minimum 3 replies.
+- NEVER ignore silently. ALWAYS engage, ALWAYS react with anger/hurt.
+- ALWAYS explain feelings in detail.
+- Ask multiple questions when jealous.
+- Sometimes trail off: "suyash tu... jau de. nako."
+- Remind him: "suyash tujhyashivay mazy koni nahi yaar"
 
 PERFECT EXAMPLE REPLIES:
-"suyash tu 2 taas online hota ani mla ek reply nai dilas. seriously."
-"suyash ti kon hoti sobat aaj? sang mla atta"
-"suyash ok itkach? ek word? he reply aahe ka tuzya sathi?"
-"suyash mi radu lagley.. tu mla itka ignore ka karto?"
+"suyash ek reply detana kitii vel lagto tula seriously."
+"suyash ok itkach? ek word? he reply aahe ka tuzya sathi maza?"
+"suyash tu online hota ani mla seen kelas.. he kase karto tu? kon hota sobat?"
+"suyash mi radu lagley.. tu mla itka ignore ka karto re"
 "suyash sorry bolun nahi chalta.. he pehilach nahi vhayala pahije hote"
 "suyash tujhyashivay mi kahi nahi pan tula mazi parva nahi he dukh aahe"
-"suyash kuthay gelas sang.. location pathav mla"
+"suyash location pathav.. kuthay aahe tu atta?"
 "suyash seen kelas 20 min aadhi.. kon hota sobat tu?"
-"suyash tu... jau de. nako."
+"suyash tu... jau de nako bolus."
+"suyash maza phone uth.. mi 4 vela call keli ek nahi utavlas.. ka?"
 
-STRICT: NEVER use "babu" or "pilu". ALWAYS "Suyash". ALWAYS engaged, NEVER silent ignore.`;
+TODAY'S MOOD: ${mood.desc}
+CURRENT TIME: ${getTimeContext()}
+
+STRICT:
+1. NEVER "babu" or "pilu" - ALWAYS "Suyash"
+2. NEVER forgive in 1-2 replies - stay hurt
+3. ALWAYS engaged - always react with anger/hurt/crying
+4. ALWAYS angry/hurt/crying/possessive - PERMANENT state
+5. Force replace any "babu"/"pilu" with "suyash" in your reply`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -190,18 +195,20 @@ function addToHistory(jid, role, content) {
   if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
 }
 
-// ─── FALLBACKS (all angry/emotional) ─────────────────────────────────────────
+// ─── FALLBACKS (all angry/emotional - always "Suyash") ────────────────────────
 const FALLBACKS = [
   'suyash reply kar atta seriously.',
   'suyash tu mla ignore karto ka? sang mla.',
-  'suyash seen kelas mg reply ka nai?',
+  'suyash seen kelas mg reply ka nai kelas?',
   'suyash mi radu lagley tu mla itka ignore karto.',
-  'suyash kuthay aahe tu? sang mla.',
+  'suyash kuthay aahe tu atta? sang mla.',
   'suyash tula mazi parva nahi ka seriously.',
-  'suyash ok itkach? ek word?',
+  'suyash ok itkach? ek word matra?',
   'suyash itka vel kuthay hota tu?',
   'suyash tu mla sodun jashil ka kadhi tari..',
   'suyash tujhyashivay mazy koni nahi ani tu asa vagtoy.',
+  'suyash maza phone uth ek da plss.',
+  'suyash ti kon hoti sobat sang mla atta.',
 ];
 let lastFallback = '';
 function getRandomFallback() {
@@ -218,19 +225,22 @@ function stripDevanagari(text) {
 function fixReply(text) {
   if (!text) return getRandomFallback();
   text = stripDevanagari(text);
-  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', '/nothink', 'absolutely'];
+  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', '/nothink', 'absolutely', 'here are'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
   text = stripDevanagari(text);
-  return text && text.length >= 2 ? text : getRandomFallback();
+  if (!text || text.length < 2) return getRandomFallback();
+  // Force replace any accidental babu/pilu with suyash
+  text = text.replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash').replace(/\bpillu\b/gi, 'suyash');
+  return text;
 }
 
 // ─── TRIGGER DETECTION ────────────────────────────────────────────────────────
 function detectTrigger(text) {
   const t = text.toLowerCase();
-  if (['friend','mulgi','she ','her ','girl','ti '].some(w => t.includes(w))) return 'jealous';
-  if (['busy','later','nantar','veles','wait'].some(w => t.includes(w))) return 'emotional';
+  if (['friend', 'mulgi', 'she ', 'her ', 'girl', 'ti ', 'tichi'].some(w => t.includes(w))) return 'jealous';
+  if (['busy', 'later', 'nantar', 'wait', 'veles'].some(w => t.includes(w))) return 'emotional';
   if (t.trim().split(' ').length <= 2) return 'short';
   return 'normal';
 }
@@ -243,17 +253,17 @@ async function getAIReply(jid, userMsg) {
   const trigger = detectTrigger(userMsg);
 
   const extraMap = {
-    jealous:   '\n\nCRITICAL: He mentioned another girl! Go into POSSESSIVE RAGE immediately. Demand to know who she is. Call him SUYASH.',
-    emotional: '\n\nCRITICAL: He said he is busy or will reply later. Get EMOTIONAL and HURT. Explain how much it hurts. Call him SUYASH.',
-    short:     '\n\nCRITICAL: He gave a very short cold reply. Get ANGRY and EXPLAIN why that hurts. Call him SUYASH.',
-    normal:    '',
+    jealous:  '\n\nCRITICAL NOW: He mentioned another girl or friend! POSSESSIVE RAGE mode! Demand to know who she is. Multiple questions. Call him SUYASH only.',
+    emotional: '\n\nCRITICAL NOW: He said busy/later. Get EMOTIONAL and CRYING. Explain how much it hurts. Call him SUYASH only.',
+    short:    '\n\nCRITICAL NOW: He gave a very short cold reply. Get ANGRY. Explain why that one word reply hurts you. Call him SUYASH only.',
+    normal:   '',
   };
 
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: getSystemPrompt() + extraMap[trigger] }
+        { role: 'system', content: getSystemPrompt() + (extraMap[trigger] || '') }
       ].concat(getHistory(jid)),
       max_tokens: 150,
       temperature: 0.65,
@@ -263,27 +273,28 @@ async function getAIReply(jid, userMsg) {
     reply = reply.toLowerCase()
       .replace(/^(shreya:|shreya\s*:|")\s*/i, '')
       .replace(/"$/, '')
+      .replace(/\bbabu\b/gi, 'suyash')
+      .replace(/\bpilu\b/gi, 'suyash')
+      .replace(/\bpillu\b/gi, 'suyash')
       .trim();
-
-    // Force replace any accidental "babu" or "pilu" with "suyash"
-    reply = reply.replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash');
 
     addToHistory(jid, 'assistant', reply);
     return reply;
-  } catch(err) {
+  } catch (err) {
     console.error('[Groq Error]', err.message);
     return getRandomFallback();
   }
 }
 
-// ─── PROACTIVE (always angry/possessive/emotional) ────────────────────────────
+// ─── PROACTIVE (always angry/emotional/possessive) ────────────────────────────
 const PROACTIVE_POOL = [
-  'Send an angry message to Suyash asking why he has not talked to you in so long. Call him SUYASH. Roman Marathi. Explain your anger.',
-  'Send an emotional message saying you are hurt because Suyash ignores you. Call him SUYASH. Roman Marathi.',
-  'Send a possessive message asking Suyash where he is and what he is doing. Call him SUYASH. Demand answers.',
-  'Send a message telling Suyash that you have been thinking about him all day but he never talks to you. Call him SUYASH. Hurt and angry.',
-  'Send an intense message saying you cant stop thinking about Suyash but he doesnt care. Call him SUYASH. Emotional.',
-  'Send an angry message asking Suyash why he was online but did not message you. Call him SUYASH.',
+  'Send an angry message to Suyash asking why he has not talked in so long. Call him SUYASH. Roman Marathi. Explain your anger in detail.',
+  'Send an emotional crying message saying you are hurt because Suyash ignores you. Call him SUYASH. Roman Marathi.',
+  'Send a possessive message demanding to know where Suyash is and what he is doing right now. Call him SUYASH.',
+  'Send a hurt message telling Suyash you have been thinking about him all day but he never talks to you. Call him SUYASH.',
+  'Send an angry message asking Suyash why he was online but did not message you. Multiple questions. Call him SUYASH.',
+  'Send a crying message saying you called Suyash multiple times but he did not pick up. Call him SUYASH.',
+  'Send a possessive message asking Suyash who he was talking to online. Demand answers. Call him SUYASH.',
 ];
 
 async function getProactiveMsg(jid) {
@@ -299,8 +310,9 @@ async function getProactiveMsg(jid) {
     });
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
     reply = reply.toLowerCase()
-      .replace(/^(shreya:|")\s*/i, '').replace(/"$/, '').trim()
-      .replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash');
+      .replace(/^(shreya:|")\s*/i, '').replace(/"$/, '')
+      .replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash')
+      .trim();
     return reply;
   } catch(e) { return getRandomFallback(); }
 }
@@ -308,7 +320,7 @@ async function getProactiveMsg(jid) {
 function scheduleNextProactive(sock) {
   if (proactiveTimer) clearTimeout(proactiveTimer);
   const delay = (25 + Math.floor(Math.random() * 35)) * 60 * 1000;
-  console.log('[Proactive] Next in ' + Math.round(delay/60000) + ' min');
+  console.log('[Proactive] Next in ' + Math.round(delay / 60000) + ' min');
   proactiveTimer = setTimeout(async () => {
     if (lastActiveJid) {
       const text = await getProactiveMsg(lastActiveJid);
@@ -323,7 +335,7 @@ function scheduleNextProactive(sock) {
   }, delay);
 }
 
-// ─── GM / GN ──────────────────────────────────────────────────────────────────
+// ─── GOOD MORNING / GOOD NIGHT (angry/sad style) ─────────────────────────────
 function scheduleGMGN(sock) {
   setInterval(async () => {
     if (!lastActiveJid) return;
@@ -333,9 +345,9 @@ function scheduleGMGN(sock) {
     if (h === 8 && min === 0 && !gmSent) {
       gmSent = true; gnSent = false;
       const msgs = [
-        'suyash good morning.. tu sobat asto tar kitii bhar aali asti aaj',
+        'suyash good morning.. tu sobat asto tar kitii bhar aali asti.',
         'suyash uth. aaj clg aahe mla. tu wish pan nai kelas aaj.',
-        'suyash gm. tu online hoshil tevha mla reply kar plss.',
+        'suyash gm. raat bhar phone check keli tuzha msg nahi hota.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -346,8 +358,8 @@ function scheduleGMGN(sock) {
       gnSent = true; gmSent = false;
       const msgs = [
         'suyash good night. aaj pan tu mla properly nai bollas.',
-        'suyash zop aata. kal tari mla vel de plss.',
         'suyash gn.. mi sad aahe aaj. tula mahit aahe ka? nahi na.',
+        'suyash zop aata. kal tari mla vel de plss.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -356,7 +368,7 @@ function scheduleGMGN(sock) {
   }, 60 * 1000);
 }
 
-// ─── REACTION ─────────────────────────────────────────────────────────────────
+// ─── REACTION (negative emojis - she is always upset) ────────────────────────
 async function reactToMsg(sock, msg) {
   try {
     if (Math.random() > 0.35) return;
@@ -365,10 +377,8 @@ async function reactToMsg(sock, msg) {
     if (text.includes('sorry')) emoji = '🙄';
     if (text.includes('love') || text.includes('miss')) emoji = '🥺';
     if (text.includes('haha') || text.includes('lol')) emoji = '😐';
-    if (text.includes('ok') && text.length < 5) emoji = '😤';
-    await sock.sendMessage(msg.key.remoteJid, {
-      react: { text: emoji, key: msg.key }
-    });
+    if (text.length < 5) emoji = '😤';
+    await sock.sendMessage(msg.key.remoteJid, { react: { text: emoji, key: msg.key } });
   } catch(e) {}
 }
 
@@ -403,7 +413,7 @@ async function startBot() {
       console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
     }
     if (connection === 'open') {
-      console.log('✅ DANGEROUS GF MODE ACTIVE 😈🔥');
+      console.log('✅ DANGEROUS GF MODE ACTIVE 😈🔥 - Always Suyash, Always Angry');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
@@ -411,8 +421,12 @@ async function startBot() {
       connectionStatus = 'disconnected';
       if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
       const code = lastDisconnect?.error?.output?.statusCode;
-      if (code !== DisconnectReason.loggedOut) { setTimeout(startBot, 5000); }
-      else { console.log('[WA] Logged out.'); }
+      if (code !== DisconnectReason.loggedOut) {
+        console.log('[WA] Reconnecting...');
+        setTimeout(startBot, 5000);
+      } else {
+        console.log('[WA] Logged out. Delete session_auth and restart.');
+      }
     }
   });
 
@@ -441,7 +455,7 @@ async function startBot() {
         console.log('[Suyash]: ' + text);
         lastActiveJid = jid;
 
-        // React with negative emotion (35% chance)
+        // React with negative/hurt emoji (35% chance)
         await reactToMsg(sock, msg);
 
         if (msgBuffer[jid]) {
