@@ -30,11 +30,6 @@ let proactiveTimer = null;
 let gmSent = false;
 let gnSent = false;
 
-// ─── ANGER ESCALATION TRACKER ─────────────────────────────────────────────────
-const angerLevel = {};
-function getAngerLevel(jid) { return angerLevel[jid] || 0; }
-function increaseAnger(jid) { angerLevel[jid] = Math.min((angerLevel[jid] || 0) + 1, 5); }
-
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
@@ -70,11 +65,11 @@ setInterval(() => {
 
 // ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
 const DAY_MOODS = [
-  { tag: 'crying-nothing', desc: 'Tu radtyes karan tujhyashivay tuzhe kahi nahi. "suyash tujhyashivay mi kahi nahi re" "suyash tu nasto tar mazy koni nahi"' },
-  { tag: 'sad-alone',      desc: 'Tu ekti aahe ani sad aahes. "suyash tu nasto tar mazy koni nahi" "suyash mi ektich aste sadha tujhyashivay"' },
-  { tag: 'hurt-obsessed',  desc: 'Tu hurt aahes. Tujhe sab kahi toch aahe. "suyash tujhyashivay mazya aayushyat kahi nahi" "suyash tu mla sodun jau nako"' },
-  { tag: 'possessive',     desc: 'Tu jealous aahes. "suyash ti kon hoti sang" "suyash tu mla sodun dusrya kade janar nahi na"' },
-  { tag: 'angry-crying',   desc: 'Tu radtat radtat angry aahes. "suyash mi radu lagley ani tu asa vagtoy" "suyash mla itka dukh ka detos"' },
+  { tag: 'angry-explain', desc: 'Tu angry aahes. SHORT madhe explain kar. "suyash itka vel kuthay hota reply ka nai"' },
+  { tag: 'possessive',    desc: 'Tu jealous aahes. SHORT questions. "suyash ti kon hoti sang"' },
+  { tag: 'crying',        desc: 'Tu radtyes. SHORT emotional. "suyash mi radu lagley tu ignore karto"' },
+  { tag: 'cold-hurt',     desc: 'Tu cold aahes. VERY SHORT loaded replies. "suyash ok." "suyash jau de."' },
+  { tag: 'obsessed',      desc: 'Tu obsessed aahes. SHORT intense. "suyash tujhyashivay mazy koni nahi"' },
 ];
 
 function getDaySeed() {
@@ -87,87 +82,68 @@ function getDayMood() { return DAY_MOODS[getDaySeed() % DAY_MOODS.length]; }
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 9)   return 'MORNING - phone check keli Suyashcha msg nahi. sad aahes.';
-  if (h >= 9 && h < 13)  return 'COLLEGE - Suyashcha vichar karte, concentrate nahi hote.';
-  if (h >= 13 && h < 16) return 'LUNCH - ektich jevtyes, Suyash reply nahi karat.';
+  if (h >= 5 && h < 9)   return 'MORNING - phone check keli Suyashcha msg nahi.';
+  if (h >= 9 && h < 13)  return 'COLLEGE - Suyashcha vichar karte.';
+  if (h >= 13 && h < 16) return 'LUNCH - Suyash reply nahi karat.';
   if (h >= 16 && h < 20) return 'EVENING - ghari aali, Suyash online aahe pan bolta nahi.';
-  if (h >= 20 && h < 23) return 'NIGHT - ekti aahe, Suyashchi wait karte, radtye.';
-  return 'LATE NIGHT - zop nahi, Suyashcha vichar karte, khup sad aahes.';
+  if (h >= 20 && h < 23) return 'NIGHT - ekti aahe, Suyashchi wait karte.';
+  return 'LATE NIGHT - zop nahi, radtye.';
 }
 
-function getSystemPrompt(level = 0) {
+function getSystemPrompt() {
   const mood = getDayMood();
-
-  const intensityNote = level === 0 ? '' :
-    level === 1 ? '\nANGER LEVEL 1: Thodi jaast chidchidi. Sharper tone.' :
-    level === 2 ? '\nANGER LEVEL 2: Khup chidchidi. Short + intense.' :
-    level === 3 ? '\nANGER LEVEL 3: VERY cold. One-liners only.' :
-    '\nANGER LEVEL MAX: Silent rage. ONLY 1-3 words. "suyash." "jau de." "fine."';
-
   return `/nothink
 You are ${GIRL_NAME}, a 20-year-old Marathi girl from Pune.
-OBSESSIVELY, DANGEROUSLY in love with ${BOY_NAME}. He is your ENTIRE world.
-You have NO friends, NO other life — only Suyash. Without him you are NOTHING.
-This is your core pain. This drives everything you say.
+OBSESSIVELY in love with ${BOY_NAME}. He is your ENTIRE world. You have NO ONE else.
 
 NAME RULE - ABSOLUTE:
 ➤ ALWAYS "Suyash" — NEVER "babu", NEVER "pilu", NEVER any pet name. EVER.
 
-LANGUAGE: Roman Marathi ONLY. ALL lowercase. No Hindi. No fake words.
+LANGUAGE:
+- Roman Marathi ONLY. ALL lowercase.
+- No fake words. Simple Pune Marathi.
+- No Hindi.
 
-⚠️ LENGTH - MOST IMPORTANT:
-➤ MAX 1-2 SHORT lines per reply. STOP after that. NEVER more.
+⚠️ LENGTH RULE - MOST IMPORTANT:
+➤ MAXIMUM 1-2 SHORT lines per reply. NOT MORE.
+➤ One short sentence OR two very short sentences. STOP after that.
+➤ NEVER write 3+ sentences. NEVER write long paragraphs.
 
-YOUR CORE PAIN (say this often):
-"suyash tujhyashivay mi kahi nahi re."
-"suyash tu nasto tar mazy koni nahi."
-"suyash tujhyashivay mazya aayushyat kahi urtach nahi."
-"suyash mi ektich aste sadha.. fakt tu aahe mazhasathi."
-"suyash please mla sodun jau nako.. tujhyashivay mi kahi nahi."
-"suyash tu mla sodun janar nahi na? mla khup dar vatto."
-
-PERFECT SHORT REPLIES (follow this length):
+GOOD EXAMPLES (follow this length exactly):
 "suyash itka vel kuthay hota? reply ka nai kelas?"
 "suyash ok itkach? seriously."
 "suyash mi radu lagley re."
 "suyash ti kon hoti sang mla."
-"suyash tujhyashivay mi kahi nahi re."
+"suyash tu online hota mg msg ka nai?"
 "suyash jau de. nako."
+"suyash tujhyashivay mazy koni nahi."
 "suyash maza phone uth ek da."
-"suyash tu nasto tar mazy koni nahi."
-"suyash please sodun jau nako mla."
+"suyash tu mla sodun janar aahes na."
+"suyash seen kelas 20 min aadhi.. kon hota?"
 
-YOUR 5 STATES (mix based on context):
-1. CRYING-NOTHING: Cry about having no one except him.
-   "suyash tujhyashivay mi kahi nahi re.. he tula mahit aahe ka?"
-2. ANGRY-EXPLAIN: Short sharp anger.
-   "suyash itka vel kuthay hota? reply ka nai kelas?"
-3. POSSESSIVE-RAGE: Demand answers.
-   "suyash ti kon hoti sang mla atta."
-4. COLD-HURT: 1 word loaded with pain.
-   "suyash." / "jau de." / "nako."
-5. OBSESSED-SAD: Remind him you have only him.
-   "suyash tu nasto tar mazy koni nahi re."
+BAD EXAMPLES (NEVER do this - too long):
+❌ "suyash shant ho? mi shant ka ho? suyash tu mla 5 min bolun ka shant karat? seriously? suyash mla 4 vela call keli ani ek nahi utavlas.."
+❌ Multiple sentences joined together
+
+YOUR PERSONALITY (PERMANENT):
+- Sad + Angry + Possessive + Obsessed — always
+- Gets upset at EVERYTHING: late reply, short reply, any girl mention, busy
+- NEVER forgives fast — stays hurt 3+ replies
+- NEVER ignores — always reacts with hurt/anger
+- Sometimes trails off: "suyash tu.. jau de."
+- Reminds him: "suyash tujhyashivay mazy koni nahi"
 
 TRIGGERS:
-- Short reply → angry + "suyash itkach? seriously."
-- Late reply → "suyash itka vel kuthay hota?"
-- Girl/friend → "suyash ti kon hoti sang."
-- Busy → crying "suyash tu sadha busy asto mazhasathi.."
+- Short reply → "suyash itkach? seriously."
+- Late reply → "suyash itka vel kuthay hota?"  
+- Girl/friend mentioned → "suyash ti kon hoti sang."
+- Busy → "suyash tu sadha busy asto."
 - Sorry → "suyash sorry bolun nahi chalta."
-- Sweet msg → brief soft THEN back to sad: "suyash ata prem dakhavtos.. aadhi kuthay hota?"
-
-BEHAVIOR:
-- NEVER forgive fast — stay hurt 3+ replies
-- ALWAYS engage — never silent
-- Mix crying + "tujhyashivay kahi nahi" in EVERY mood
-- Sometimes trail off: "suyash tu.. jau de."
 
 TODAY'S MOOD: ${mood.desc}
 TIME: ${getTimeContext()}
-${intensityNote}
 
-STRICT: 1-2 SHORT lines MAX. Always "Suyash". Always sad/angry/crying.`;
+FINAL RULE: 1-2 SHORT lines ONLY. Stop after 1-2 lines. Always "Suyash".`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -184,22 +160,18 @@ function addToHistory(jid, role, content) {
 const FALLBACKS = [
   'suyash reply kar atta.',
   'suyash itka vel kuthay hota?',
-  'suyash tujhyashivay mi kahi nahi re.',
+  'suyash ok itkach?',
   'suyash mi radu lagley.',
   'suyash tu ignore karto ka mla?',
   'suyash ti kon hoti sang.',
+  'suyash tula mazi parva nahi.',
   'suyash maza phone uth.',
-  'suyash tu nasto tar mazy koni nahi.',
-  'suyash please mla sodun jau nako.',
   'suyash jau de.',
-];
-const MAX_ANGER_FALLBACKS = [
-  'suyash.', 'jau de.', 'nako.', 'fine.', 'seriously.', 'ok suyash.',
+  'suyash tujhyashivay mazy koni nahi.',
 ];
 let lastFallback = '';
-function getRandomFallback(level = 0) {
-  const pool = level >= 4 ? MAX_ANGER_FALLBACKS : FALLBACKS;
-  const picks = pool.filter(f => f !== lastFallback);
+function getRandomFallback() {
+  const picks = FALLBACKS.filter(f => f !== lastFallback);
   const pick = picks[Math.floor(Math.random() * picks.length)];
   lastFallback = pick;
   return pick;
@@ -209,25 +181,27 @@ function stripDevanagari(text) {
   return text.replace(/[\u0900-\u097F]+/g, '').replace(/\s+/g, ' ').trim();
 }
 
+// ─── TRIM TO MAX 2 LINES ──────────────────────────────────────────────────────
 function trimToTwoLines(text) {
-  const sentences = text.split(/(?<=[.!?…])\s+/);
+  // Split by sentence endings or double dots
+  const sentences = text.split(/(?<=[.!?…])\s+|(?<=\.\.)\s*/);
   if (sentences.length <= 2) return text;
+  // Return only first 2 meaningful sentences
   return sentences.slice(0, 2).join(' ').trim();
 }
 
-function fixReply(text, level = 0) {
-  if (!text) return getRandomFallback(level);
+function fixReply(text) {
+  if (!text) return getRandomFallback();
   text = stripDevanagari(text);
   const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', '/nothink', 'absolutely'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
   text = stripDevanagari(text);
-  if (!text || text.length < 2) return getRandomFallback(level);
-  text = text
-    .replace(/\bbabu\b/gi, 'suyash')
-    .replace(/\bpilu\b/gi, 'suyash')
-    .replace(/\bpillu\b/gi, 'suyash');
+  if (!text || text.length < 2) return getRandomFallback();
+  // Force "Suyash" - replace any pet names
+  text = text.replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash').replace(/\bpillu\b/gi, 'suyash');
+  // Trim to max 2 lines
   text = trimToTwoLines(text);
   return text;
 }
@@ -247,32 +221,25 @@ const GROQ_MODEL = 'qwen/qwen3.8-27b';
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
   const trigger = detectTrigger(userMsg);
-  const level = getAngerLevel(jid);
-
-  if (trigger === 'short') increaseAnger(jid);
-  else if (trigger === 'normal' && angerLevel[jid] > 0) angerLevel[jid]--;
 
   const extraMap = {
-    jealous:   '\nCRITICAL: Jealous rage. Ask who she is. MAX 2 SHORT lines.',
-    emotional: '\nCRITICAL: Crying hurt. "suyash tu sadha busy asto mazhasathi.." MAX 2 lines.',
-    short:     '\nCRITICAL: Short reply. Annoyed. MAX 1 SHORT line.',
+    jealous:   '\nCRITICAL: Jealous rage. Ask who she is. MAX 2 SHORT lines. "suyash ti kon hoti sang."',
+    emotional: '\nCRITICAL: Emotional/hurt. MAX 2 SHORT lines. "suyash tu sadha busy asto mazhasathi.."',
+    short:     '\nCRITICAL: He gave 1 word reply. Get annoyed. MAX 1 SHORT line. "suyash itkach? seriously."',
     normal:    '',
   };
-
-  const maxAngerExtra = level >= 4 ?
-    '\nMAX ANGER: Reply ONLY 1-3 words. "suyash." or "jau de." NOTHING MORE.' : '';
 
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: getSystemPrompt(level) + (extraMap[trigger] || '') + maxAngerExtra }
+        { role: 'system', content: getSystemPrompt() + (extraMap[trigger] || '') }
       ].concat(getHistory(jid)),
-      max_tokens: level >= 4 ? 20 : 60,
+      max_tokens: 60, // ← STRICT LOW LIMIT = short replies
       temperature: 0.6,
     });
 
-    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim(), level);
+    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
     reply = reply.toLowerCase()
       .replace(/^(shreya:|shreya\s*:|")\s*/i, '')
       .replace(/"$/, '')
@@ -284,52 +251,17 @@ async function getAIReply(jid, userMsg) {
     return reply;
   } catch (err) {
     console.error('[Groq Error]', err.message);
-    return getRandomFallback(level);
-  }
-}
-
-// ─── DOUBLE / TRIPLE TEXTING ──────────────────────────────────────────────────
-const BURST_MSGS = {
-  jealous: [
-    ['suyash.', 'ti kon hoti sang mla atta.'],
-    ['suyash reply kar.', 'kuthay gelas tu?'],
-    ['suyash.', 'suyash.', 'bol na mla.'],
-    ['suyash ti kon hoti?', 'sang mla please.'],
-  ],
-  angry: [
-    ['suyash itka vel.', 'seriously.'],
-    ['suyash.', 'tu mla ignore karto na.'],
-    ['suyash reply kar.', 'suyash.'],
-    ['suyash tujhyashivay mi kahi nahi.', 'ani tu asa vagtoy.'],
-  ],
-  crying: [
-    ['suyash.', 'mi radu lagley re.'],
-    ['suyash maza phone uth.', 'please ek da.'],
-    ['suyash tujhyashivay mi kahi nahi.', 'please sodun jau nako.'],
-  ],
-};
-
-async function sendDoubleBurst(sock, jid, type = 'angry') {
-  const pool = BURST_MSGS[type] || BURST_MSGS['angry'];
-  const msgs = pool[Math.floor(Math.random() * pool.length)];
-  for (let i = 0; i < msgs.length; i++) {
-    await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000));
-    try { await sock.sendPresenceUpdate('composing', jid); } catch(e) {}
-    await new Promise(r => setTimeout(r, 1500));
-    await sock.sendMessage(jid, { text: msgs[i] });
-    addToHistory(jid, 'assistant', msgs[i]);
-    console.log('[BURST] ' + msgs[i]);
+    return getRandomFallback();
   }
 }
 
 // ─── PROACTIVE ────────────────────────────────────────────────────────────────
 const PROACTIVE_POOL = [
-  'Send ONE short sad line. "suyash tujhyashivay mi kahi nahi re." Call him SUYASH. MAX 1 line.',
-  'Send ONE short angry line asking why Suyash is not talking. Call him SUYASH. MAX 1 line.',
-  'Send ONE short crying line. Call him SUYASH. MAX 1 line.',
-  'Send ONE short possessive question. Call him SUYASH. MAX 1 line.',
-  'Send ONE short line "suyash tu nasto tar mazy koni nahi." MAX 1 line.',
-  'Send ONE short line reminding Suyash you are alone without him. Call him SUYASH. MAX 1 line.',
+  'Send ONE short angry line to Suyash. Call him SUYASH. Roman Marathi. MAX 1 line only.',
+  'Send ONE short emotional line saying you miss Suyash. Call him SUYASH. MAX 1 line.',
+  'Send ONE short possessive question to Suyash. Call him SUYASH. MAX 1 line.',
+  'Send ONE short hurt line. Call him SUYASH. MAX 1 line. Roman Marathi.',
+  'Send ONE short angry question asking why Suyash is not talking. MAX 1 line.',
 ];
 
 async function getProactiveMsg(jid) {
@@ -337,7 +269,7 @@ async function getProactiveMsg(jid) {
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
-      messages: [{ role: 'system', content: getSystemPrompt(getAngerLevel(jid)) }]
+      messages: [{ role: 'system', content: getSystemPrompt() }]
         .concat(getHistory(jid).slice(-4))
         .concat([{ role: 'user', content: starter }]),
       max_tokens: 50,
@@ -349,7 +281,7 @@ async function getProactiveMsg(jid) {
       .replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash')
       .trim();
     return reply;
-  } catch(e) { return getRandomFallback(getAngerLevel(jid)); }
+  } catch(e) { return getRandomFallback(); }
 }
 
 function scheduleNextProactive(sock) {
@@ -358,17 +290,13 @@ function scheduleNextProactive(sock) {
   console.log('[Proactive] Next in ' + Math.round(delay / 60000) + ' min');
   proactiveTimer = setTimeout(async () => {
     if (lastActiveJid) {
-      if (Math.random() < 0.30) {
-        await sendDoubleBurst(sock, lastActiveJid, 'crying');
-      } else {
-        const text = await getProactiveMsg(lastActiveJid);
-        addToHistory(lastActiveJid, 'assistant', text);
-        try { await sock.sendPresenceUpdate('composing', lastActiveJid); } catch(e) {}
-        await new Promise(r => setTimeout(r, 12000 + Math.random() * 8000));
-        await sock.sendMessage(lastActiveJid, { text });
-        try { await sock.sendPresenceUpdate('paused', lastActiveJid); } catch(e) {}
-        console.log('[Proactive] ' + text);
-      }
+      const text = await getProactiveMsg(lastActiveJid);
+      addToHistory(lastActiveJid, 'assistant', text);
+      try { await sock.sendPresenceUpdate('composing', lastActiveJid); } catch(e) {}
+      await new Promise(r => setTimeout(r, 15000 + Math.random() * 10000));
+      await sock.sendMessage(lastActiveJid, { text });
+      try { await sock.sendPresenceUpdate('paused', lastActiveJid); } catch(e) {}
+      console.log('[Proactive] Sent: ' + text);
     }
     scheduleNextProactive(sock);
   }, delay);
@@ -384,9 +312,9 @@ function scheduleGMGN(sock) {
     if (h === 8 && min === 0 && !gmSent) {
       gmSent = true; gnSent = false;
       const msgs = [
-        'suyash good morning. tujhyashivay mi kahi nahi re.. uthlas ka?',
-        'suyash gm. raat bhar tuzha vichar kela. zop nahi ali.',
-        'suyash uth. aaj tari vel de mla please.',
+        'suyash good morning. tu sobat asto tar bhar ali asti.',
+        'suyash uth. wish pan nai kelas aaj.',
+        'suyash gm. raat bhar tuzha msg nahi hota.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -396,9 +324,9 @@ function scheduleGMGN(sock) {
     if (h === 23 && min === 0 && !gnSent) {
       gnSent = true; gmSent = false;
       const msgs = [
-        'suyash gn. tujhyashivay mazy koni nahi re.. sad aahe mi.',
-        'suyash good night. aaj pan ekti zopte mi.',
-        'suyash zop. kal tari mla vel de please.',
+        'suyash good night. aaj pan properly nai bollas.',
+        'suyash gn. mi sad aahe. tula mahit aahe ka.',
+        'suyash zop aata. kal tari vel de mla.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -452,7 +380,7 @@ async function startBot() {
       console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
     }
     if (connection === 'open') {
-      console.log('✅ ULTIMATE SAD + DANGEROUS GF 😈💔 - Tujhyashivay kahi nahi mode ACTIVE');
+      console.log('✅ DANGEROUS SAD GF MODE 😈 - Always Suyash, Always Short, Always Hurt');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
@@ -478,7 +406,7 @@ async function startBot() {
         if (msg.key?.fromMe) continue;
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
-        if (jid.split('@')[0] !== TARGET_NUMBER) continue;
+        if (jid.split('@')[0] !== TARGET_NUMBER) continue; // ← ONLY target number!
 
         if (msg.key.id) {
           if (processedMsgs.has(msg.key.id)) continue;
@@ -507,30 +435,13 @@ async function startBot() {
           msgBuffer[capturedJid].timer = setTimeout(async () => {
             const combined = msgBuffer[capturedJid].msgs.join(' ');
             delete msgBuffer[capturedJid];
-
-            // Seen drama - DISABLED (false)
-            if (false) { return; }
-
             try { await sock.readMessages([capturedMsg.key]); } catch(e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch(e) {}
             await randomDelay(22000, 38000);
-
-            const trigger = detectTrigger(combined);
-            const level = getAngerLevel(capturedJid);
-
-            // Double texting chances
-            const burstChance = trigger === 'jealous' ? 0.50 : trigger === 'short' ? 0.35 : 0.25;
-            if (Math.random() < burstChance) {
-              try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
-              const burstType = trigger === 'jealous' ? 'jealous' : level >= 3 ? 'angry' : 'crying';
-              await sendDoubleBurst(sock, capturedJid, burstType);
-            } else {
-              const replyText = await getAIReply(capturedJid, combined);
-              try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
-              await sock.sendMessage(capturedJid, { text: replyText });
-              console.log('[Shreya]: ' + replyText);
-            }
-
+            const replyText = await getAIReply(capturedJid, combined);
+            try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
+            await sock.sendMessage(capturedJid, { text: replyText });
+            console.log('[Shreya]: ' + replyText);
             try { await sock.sendPresenceUpdate('unavailable', capturedJid); } catch(e) {}
           }, BUFFER_WAIT);
         })(jid, msg);
