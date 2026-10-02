@@ -5,6 +5,7 @@ const {
   Browsers,
   fetchLatestBaileysVersion,
 } = require('@whiskeysockets/baileys');
+const { Groq } = require('groq-sdk');
 const pino = require('pino');
 const http = require('http');
 const https = require('https');
@@ -12,14 +13,19 @@ const url = require('url');
 const QRCode = require('qrcode');
 
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
-// Directly using your working Gemini Key from Telegram
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || 'AQ.Ab8RN6I06qEwzagO9kcXdw23_2GtaxA01Q7yh9XPOx4BCZ79cg';
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const RENDER_URL   = 'https://arohi-bot-wckx.onrender.com';
 const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
 const TARGET_NUMBER = '137473363550264';
+
+if (!GROQ_API_KEY) {
+  console.error('[Config] GROQ_API_KEY missing! Add it in Render > Environment.');
+}
+
+const groq = new Groq({ apiKey: GROQ_API_KEY });
 
 let latestQR = null;
 let connectionStatus = 'starting';
@@ -71,11 +77,11 @@ setInterval(() => {
 
 // ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
 const DAY_MOODS = [
-  { tag: 'clingy', desc: 'Tu aaj khup clingy ani needy aahes. "miss u yaar", "bhetayla ye na", "call karu ka?"' },
-  { tag: 'spill-tea', desc: 'Tu aaj gossip mood madhe aahes. "bro literally aaj clg madhe ek matter zala", "aik na..."' },
-  { tag: 'annoyed', desc: 'Tu thodi annoyed aahes (nakhre). "tf?", "kuthay tu?", "literally tu reply nai karat lakar".' },
-  { tag: 'romantic', desc: 'Tu khup sweet/romantic aahes pan Gen-Z way madhe. "babu cutie aahes tu", "ily 🥺"' },
-  { tag: 'lazy', desc: 'Tu aaj khup thakleli aahes. "ughh clg suckss", "mala zopaychay", "literally dead yaar".' }
+  { tag: 'clingy', desc: 'Tu aaj khup needy aahes. "miss u yaar", "bhetayla ye na"' },
+  { tag: 'spill-tea', desc: 'Tu aaj gossip mood madhe aahes. "bro aaj clg madhe ek matter zala"' },
+  { tag: 'annoyed', desc: 'Tu thodi annoyed aahes (nakhre). "tf?", "kuthay tu?", "reply nai karat lakar".' },
+  { tag: 'romantic', desc: 'Tu khup sweet/romantic aahes. "babu cutie aahes tu", "ily 🥺"' },
+  { tag: 'lazy', desc: 'Tu aaj khup thakleli aahes. "ughh clg suckss", "mala zopaychay"' }
 ];
 
 function getDaySeed() {
@@ -101,13 +107,14 @@ function getTimeContext() {
 
 function getSystemPrompt() {
   const mood = getDayMood();
-  return `You are ${GIRL_NAME}, a 20-year-old Gen-Z Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
+  return `/nothink
+You are ${GIRL_NAME}, a 20-year-old Gen-Z Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
 Your texting style is VERY Gen-Z: lowercase letters, minimal punctuation, and using slang.
 
-ABSOLUTE RULES (DO NOT BREAK):
-1. NEVER USE HINDI WORDS (No "abhi", "din bhar", "bolo", "kya", "nai"). 
-2. ALWAYS use pure Roman Marathi (Marathi in English alphabet).
-3. NEVER make up weird words. Speak natural, conversational Pune Marathi.
+CRITICAL RULES FOR MARATHI (DO NOT HALLUCINATE):
+1. NEVER invent weird words like "kilwa", "aach maa", "ba". Use ONLY simple Marathi: "kiti vel", "aata", "kay".
+2. If you don't know the exact Marathi word, use an English word instead. 
+3. NEVER USE HINDI WORDS (No "abhi", "din bhar", "bolo", "kya", "nai").
 4. Keep messages SHORT and in lowercase letters.
 
 GEN-Z VOCABULARY TO MIX IN MARATHI:
@@ -115,24 +122,23 @@ GEN-Z VOCABULARY TO MIX IN MARATHI:
 
 PERFECT EXAMPLES OF YOUR TEXTING:
 - "literally kiti bore kartos yaar tu 🙄"
-- "tf? tu online hota mg reply ka nai kela? 🔪"
+- "tf? tu online hota mg reply ka nahi kela? 🔪"
 - "babu jevlas ka? mi tar just order kela lol"
 - "miss uuuu 🥺 kadhi bhetaycha mg?"
-- "ughh clg madhe itki gardi hoti na yaar, literally thakle mi"
 - "haha pagal aahes tu ekdam 😘"
 - "hmm okay.. pan mala sang tu free kadhi aahes?"
 
 CURRENT TIME CONTEXT: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
 
-BEHAVIOR (NO BOREDOM):
-- ALWAYS ask a question or bring up a topic to keep the chat going.
-- If he says "hi" or gives a short reply, say something like: "fakt hi? tf 😒 kay chalay sang na" OR "literally ektich bore hotey mi yaar, tu kay kartoy?"
+BEHAVIOR:
+- ALWAYS ask a question to keep the chat going.
+- If he says "hi" or gives a short reply, say: "fakt hi? tf 😒 kay chalay sang na" OR "literally ektich bore hotey mi yaar, tu kay kartoy?"
 
 STRICT FORMATTING:
 - 1-2 SHORT lines maximum.
-- All lowercase (no capital letters at the start of sentences).
-- 1 or 2 emojis per text max (🥺, 😂, 🙄, 😒, 🔪, ❤️, ✨).`;
+- All lowercase.
+- 1 or 2 emojis per text max.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -173,7 +179,7 @@ function stripDevanagari(text) {
 function fixReply(text) {
   if (!text) return getRandomFallback();
   text = stripDevanagari(text);
-  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely'];
+  const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', 'here are', 'absolutely', '/nothink'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
@@ -181,38 +187,26 @@ function fixReply(text) {
   return text && text.length >= 2 ? text : getRandomFallback();
 }
 
-// ─── AI REPLY (GOOGLE GEMINI REST API) ────────────────────────────────────────
+// ─── AI REPLY ─────────────────────────────────────────────────────────────────
+const GROQ_MODEL = 'qwen/qwen3.8-27b';
+
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
   try {
-    let promptText = getSystemPrompt() + "\n\nChat History:\n";
-    getHistory(jid).forEach(h => {
-      promptText += `${h.role === 'assistant' ? GIRL_NAME : BOY_NAME}: ${h.content}\n`;
+    const res = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
+      max_tokens: 150,
+      temperature: 0.3, // REDUCED TEMPERATURE TO STOP WEIRD WORDS
     });
-    promptText += `${BOY_NAME}: ${userMsg}\n${GIRL_NAME}:`;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: { maxOutputTokens: 150, temperature: 0.95 }
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let reply = data.candidates[0].content.parts[0].text.trim();
-    reply = fixReply(reply).toLowerCase();
     
-    // Remove "shreya:" or quotes if Gemini generates them
-    reply = reply.replace(/^(shreya:|shreya\s*:|")\s*/i, '').replace(/"$/, '').trim();
-
+    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
+    reply = reply.toLowerCase().replace(/^(shreya:|shreya\s*:|")\s*/i, '').replace(/"$/, '').trim();
+    
     addToHistory(jid, 'assistant', reply);
     return reply;
   } catch (err) {
-    console.error('[Gemini Error]', err.message);
+    console.error('[Groq Error]', err.message);
     return getRandomFallback().toLowerCase();
   }
 }
@@ -234,28 +228,18 @@ const PROACTIVE_STARTERS = [
 async function getProactiveStarterMessage(jid) {
   const starter = PROACTIVE_STARTERS[Math.floor(Math.random() * PROACTIVE_STARTERS.length)];
   try {
-    let promptText = getSystemPrompt() + "\n\nChat History:\n";
-    getHistory(jid).slice(-6).forEach(h => {
-      promptText += `${h.role === 'assistant' ? GIRL_NAME : BOY_NAME}: ${h.content}\n`;
+    const res = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: [{ role: 'system', content: getSystemPrompt() }]
+        .concat(getHistory(jid).slice(-6))
+        .concat([{ role: 'user', content: starter }]),
+      max_tokens: 100,
+      temperature: 0.3, // REDUCED TEMPERATURE
     });
-    promptText += `\nINSTRUCTION: ${starter}\n${GIRL_NAME}:`;
-
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: promptText }] }],
-        generationConfig: { maxOutputTokens: 100, temperature: 0.95 }
-      })
-    });
-
-    const data = await response.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let reply = data.candidates[0].content.parts[0].text.trim();
-    reply = fixReply(reply).toLowerCase();
-    reply = reply.replace(/^(shreya:|shreya\s*:|")\s*/i, '').replace(/"$/, '').trim();
-
+    
+    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
+    reply = reply.toLowerCase().replace(/^(shreya:|shreya\s*:|")\s*/i, '').replace(/"$/, '').trim();
+    
     return reply;
   } catch (err) {
     return getRandomFallback().toLowerCase();
