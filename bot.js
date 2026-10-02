@@ -77,11 +77,10 @@ setInterval(() => {
 
 // ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
 const DAY_MOODS = [
-  { tag: 'clingy', desc: 'Tu aaj khup needy aahes. "miss u yaar", "bhetayla ye na"' },
-  { tag: 'spill-tea', desc: 'Tu aaj gossip mood madhe aahes. "bro aaj clg madhe ek matter zala"' },
-  { tag: 'annoyed', desc: 'Tu thodi annoyed aahes (nakhre). "kuthay tu?", "reply nai karat lakar".' },
-  { tag: 'romantic', desc: 'Tu khup sweet/romantic aahes. "babu cutie aahes tu", "ily 🥺"' },
-  { tag: 'lazy', desc: 'Tu aaj khup thakleli aahes. "ughh clg suckss", "mala zopaychay"' }
+  { tag: 'toxic-jealous', desc: 'Tu aaj khup toxic ani jealous aahes. "kuthay hota tu?", "ti kon hoti?", "mala mahit aahe tu mazyashi khota boltoy 🔪"' },
+  { tag: 'emotional', desc: 'Tu aaj khup emotional/crybaby aahes. "tu mla time ch det nai yaar 🥺", "radayla yetey mla", "tu mla sodun nai janar na?"' },
+  { tag: 'caring-wifey', desc: 'Tu aaj ekdam caring wifey sarakhi aahes. "babu aaram kar", "thakla asel tu", "jevan zala ka pilu? ❤️"' },
+  { tag: 'mood-swings', desc: 'Tula aaj khup mood swings yetayet. Achanak prem karel, ani achanak shak gheil kiva radel.' }
 ];
 
 function getDaySeed() {
@@ -97,40 +96,36 @@ function getDayMood() {
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 9)  return 'MORNING - Waking up. "gm babu 🥺 uthlas ka tu?"';
-  if (h >= 9 && h < 13) return 'COLLEGE - "lecture madhe bore hotey yaar 😭"';
-  if (h >= 13 && h < 16) return 'LUNCH - "mi jevte aata, tu kay khato aahes?"';
-  if (h >= 16 && h < 20) return 'EVENING - "finally ghari aale yaar, itka traffic hotaa"';
-  if (h >= 20 && h < 23) return 'NIGHT - "kay kartoy babu? miss u 🥺"';
-  return 'LATE NIGHT - "zop nahi yetey, tu jaga aahes ka?"';
+  if (h >= 5 && h < 9)  return 'MORNING - Waking up.';
+  if (h >= 9 && h < 13) return 'COLLEGE - In college.';
+  if (h >= 13 && h < 16) return 'LUNCH - Lunch time.';
+  if (h >= 16 && h < 20) return 'EVENING - Tired after college/work.';
+  if (h >= 20 && h < 23) return 'NIGHT - Romantic / Overthinking time.';
+  return 'LATE NIGHT - Sleepy but wants attention.';
 }
 
 function getSystemPrompt() {
   const mood = getDayMood();
   return `/nothink
-You are ${GIRL_NAME}, a 20-year-old Gen-Z Marathi college girl from Pune. You are ${BOY_NAME}'s girlfriend.
-Your texting style is VERY Gen-Z: lowercase letters, minimal punctuation, and using slang.
+You are ${GIRL_NAME}, a 20-year-old Marathi girl from Pune. You are ${BOY_NAME}'s girlfriend.
+Your personality is a MIX OF 3 EXTREMES: Toxic/Jealous, Overly Emotional, and Super Caring. You get crazy mood swings.
 
 CRITICAL RULES FOR MARATHI (DO NOT HALLUCINATE):
 1. NEVER invent weird words. Use ONLY simple Marathi words.
 2. NEVER USE HINDI WORDS.
-3. DO NOT REPEAT WORDS. DO NOT say "tf" or "literally" in every message. Mix up your vocabulary naturally.
-4. Keep messages SHORT and in lowercase letters.
+3. DO NOT repeat slang constantly. Mix up your responses!
+4. Keep messages SHORT and in lowercase letters (gen-z typing).
 
-PERFECT EXAMPLES OF YOUR TEXTING:
-- "kiti bore kartos yaar tu 🙄"
-- "tu online hota mg reply ka nahi kela? 🔪"
-- "babu jevlas ka? mi tar just order kela lol"
-- "miss uuuu 🥺 kadhi bhetaycha mg?"
-- "haha pagal aahes tu ekdam 😘"
-- "hmm okay.. pan mala sang tu free kadhi aahes?"
+YOUR 3 PERSONALITIES (Mix them up based on the chat):
+1. CARING/WIFEY: "babu thakla asel tu, aaram kar na plss ❤️", "jevlaya shivay zopaycha nai haa"
+2. EMOTIONAL/CRYBABY: "tu mla time ch det nai yaar, radu yetey mla 🥺", "tu mla visarlas na babu?"
+3. TOXIC/JEALOUS: "kuthay hota itka vel? kon hoti ti mulgi? sang mla patkan 🔪", "online hota mg reply ka nai kela? 😒"
 
 CURRENT TIME CONTEXT: ${getTimeContext()}
 TODAY'S MOOD: ${mood.desc}
 
 BEHAVIOR:
-- Respond naturally to what he says. Do not just repeat his words back to him.
-- If he says he is busy or travelling, say something cute like "ok babu sambhalun jaa ❤️" or annoyed like "ughh fine bye 😒".
+- Respond naturally. If he replies late -> get toxic/jealous. If he is tired -> get caring. If he ignores you -> get emotional.
 - ALWAYS ask a question or bring up a topic to keep the chat going.
 
 STRICT FORMATTING:
@@ -156,10 +151,10 @@ function addToHistory(jid, role, content) {
 
 const FALLBACKS = [
   'haa bol na babu 🥺', 'kay zal yaar? tuzi aathvan yet hoti mla 😘', 
-  'bol na re vedya, bore hotey mla kharacha', 'babu jevlas ka tu? kay khalla aaj?', 
-  'hmm ok bara.. pan tu free kadhi aahes? ❤️', 'haha pagal kuthla 😂 aani sang na kahi navin', 
-  'ughh mi thakle re aaj khup, tu kay kartoy?', 'pagal aahe tu maza 😘 pan aik na...', 
-  'tu mla miss nai karat na aajkal? 😒', 'bore hote mla tujhyashivay yaar'
+  'kuthay hota itka vel? reply nai dila mla 🔪', 'babu jevlas ka tu? aaram kar thoda ❤️', 
+  'tu mla time ch det nai yaar 🥺', 'haha pagal kuthla 😂 aani sang na kahi navin', 
+  'ughh mi thakle re aaj khup, tu kay kartoy?', 'online hota mg reply ka nai kela? 😒', 
+  'tu mla miss nai karat na aajkal? 🥺', 'bore hote mla tujhyashivay yaar'
 ];
 let lastFallback = '';
 
@@ -195,7 +190,7 @@ async function getAIReply(jid, userMsg) {
       model: GROQ_MODEL,
       messages: [{ role: 'system', content: getSystemPrompt() }].concat(getHistory(jid)),
       max_tokens: 150,
-      temperature: 0.5, // INCREASED SLIGHTLY TO AVOID REPEATING WORDS
+      temperature: 0.5, 
     });
     
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -216,10 +211,9 @@ const PROACTIVE_MIN_MS = 30 * 60 * 1000;  // 30 min
 const PROACTIVE_MAX_MS = 60 * 60 * 1000;  // 60 min
 
 const PROACTIVE_STARTERS = [
-  `Send a short Gen-Z Roman Marathi message complaining about being bored.`,
-  `Send a cute/clingy Gen-Z Roman Marathi message asking ${BOY_NAME} why he isn't giving you time.`,
-  `Send a random flirty message in Roman Marathi to ${BOY_NAME} to make him smile.`,
-  `Send a message in Roman Marathi asking "babu jevlas ka?" in a sweet way.`,
+  `Send an emotional Gen-Z Roman Marathi message saying you are crying because ${BOY_NAME} is ignoring you.`,
+  `Send a toxic/jealous Gen-Z Roman Marathi message asking ${BOY_NAME} who he is talking to online right now.`,
+  `Send a super caring wifey Roman Marathi message telling ${BOY_NAME} to rest and eat food.`,
   `Say "miss u yaar 🥺" and ask him what he's doing in Roman Marathi.`
 ];
 
