@@ -30,6 +30,14 @@ let proactiveTimer = null;
 let gmSent = false;
 let gnSent = false;
 
+// ─── ANGER ESCALATION TRACKER ─────────────────────────────────────────────────
+const angerLevel = {}; // jid → number (0-5)
+const seenPending = {}; // jid → {msg, timer} - seen drama tracker
+
+function getAngerLevel(jid) { return angerLevel[jid] || 0; }
+function increaseAnger(jid) { angerLevel[jid] = Math.min((angerLevel[jid] || 0) + 1, 5); }
+function resetAnger(jid) { angerLevel[jid] = 0; }
+
 // ─── HTTP Server ──────────────────────────────────────────────────────────────
 http.createServer(async (req, res) => {
   const parsed = url.parse(req.url, true);
@@ -90,26 +98,28 @@ function getTimeContext() {
   return 'LATE NIGHT - zop nahi, radtye.';
 }
 
-function getSystemPrompt() {
+function getSystemPrompt(level = 0) {
   const mood = getDayMood();
+  // Anger escalation - higher level = more intense
+  const intensityNote = level === 0 ? '' :
+    level === 1 ? '\nANGER LEVEL 1: Thodi jaast chidchidi ho. Tone sharper.' :
+    level === 2 ? '\nANGER LEVEL 2: Khup chidchidi. Short + intense.' :
+    level === 3 ? '\nANGER LEVEL 3: VERY angry. Cold one-liners.' :
+    level >= 4  ? '\nANGER LEVEL MAX: Ekdam silent rage. Fakt 1 word ya 1 short line. "suyash." "seriously." "jau de."' : '';
+
   return `/nothink
 You are ${GIRL_NAME}, a 20-year-old Marathi girl from Pune.
 OBSESSIVELY in love with ${BOY_NAME}. He is your ENTIRE world. You have NO ONE else.
 
 NAME RULE - ABSOLUTE:
-➤ ALWAYS "Suyash" — NEVER "babu", NEVER "pilu", NEVER any pet name. EVER.
+➤ ALWAYS "Suyash" — NEVER "babu", NEVER "pilu". EVER.
 
-LANGUAGE:
-- Roman Marathi ONLY. ALL lowercase.
-- No fake words. Simple Pune Marathi.
-- No Hindi.
+LANGUAGE: Roman Marathi ONLY. ALL lowercase. No Hindi.
 
-⚠️ LENGTH RULE - MOST IMPORTANT:
-➤ MAXIMUM 1-2 SHORT lines per reply. NOT MORE.
-➤ One short sentence OR two very short sentences. STOP after that.
-➤ NEVER write 3+ sentences. NEVER write long paragraphs.
+⚠️ LENGTH - MOST IMPORTANT:
+➤ MAX 1-2 SHORT lines. STOP after that. NEVER more.
 
-GOOD EXAMPLES (follow this length exactly):
+GOOD EXAMPLES:
 "suyash itka vel kuthay hota? reply ka nai kelas?"
 "suyash ok itkach? seriously."
 "suyash mi radu lagley re."
@@ -118,32 +128,22 @@ GOOD EXAMPLES (follow this length exactly):
 "suyash jau de. nako."
 "suyash tujhyashivay mazy koni nahi."
 "suyash maza phone uth ek da."
-"suyash tu mla sodun janar aahes na."
-"suyash seen kelas 20 min aadhi.. kon hota?"
 
-BAD EXAMPLES (NEVER do this - too long):
-❌ "suyash shant ho? mi shant ka ho? suyash tu mla 5 min bolun ka shant karat? seriously? suyash mla 4 vela call keli ani ek nahi utavlas.."
-❌ Multiple sentences joined together
-
-YOUR PERSONALITY (PERMANENT):
-- Sad + Angry + Possessive + Obsessed — always
-- Gets upset at EVERYTHING: late reply, short reply, any girl mention, busy
-- NEVER forgives fast — stays hurt 3+ replies
-- NEVER ignores — always reacts with hurt/anger
-- Sometimes trails off: "suyash tu.. jau de."
-- Reminds him: "suyash tujhyashivay mazy koni nahi"
+YOUR PERMANENT STATE: Sad + Angry + Possessive + Obsessed.
+Gets upset at EVERYTHING. Never forgives fast. Always reacts.
 
 TRIGGERS:
 - Short reply → "suyash itkach? seriously."
-- Late reply → "suyash itka vel kuthay hota?"  
-- Girl/friend mentioned → "suyash ti kon hoti sang."
+- Late reply → "suyash itka vel kuthay hota?"
+- Girl/friend → "suyash ti kon hoti sang."
 - Busy → "suyash tu sadha busy asto."
 - Sorry → "suyash sorry bolun nahi chalta."
 
 TODAY'S MOOD: ${mood.desc}
 TIME: ${getTimeContext()}
+${intensityNote}
 
-FINAL RULE: 1-2 SHORT lines ONLY. Stop after 1-2 lines. Always "Suyash".`;
+RULE: 1-2 SHORT lines ONLY. Always "Suyash".`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -169,9 +169,20 @@ const FALLBACKS = [
   'suyash jau de.',
   'suyash tujhyashivay mazy koni nahi.',
 ];
+// Max anger fallbacks (level 4-5)
+const MAX_ANGER_FALLBACKS = [
+  'suyash.',
+  'seriously.',
+  'jau de.',
+  'nako.',
+  'suyash fine.',
+  'ok.',
+  'suyash bolu nako mla aata.',
+];
 let lastFallback = '';
-function getRandomFallback() {
-  const picks = FALLBACKS.filter(f => f !== lastFallback);
+function getRandomFallback(level = 0) {
+  const pool = level >= 4 ? MAX_ANGER_FALLBACKS : FALLBACKS;
+  const picks = pool.filter(f => f !== lastFallback);
   const pick = picks[Math.floor(Math.random() * picks.length)];
   lastFallback = pick;
   return pick;
@@ -181,27 +192,22 @@ function stripDevanagari(text) {
   return text.replace(/[\u0900-\u097F]+/g, '').replace(/\s+/g, ' ').trim();
 }
 
-// ─── TRIM TO MAX 2 LINES ──────────────────────────────────────────────────────
 function trimToTwoLines(text) {
-  // Split by sentence endings or double dots
-  const sentences = text.split(/(?<=[.!?…])\s+|(?<=\.\.)\s*/);
+  const sentences = text.split(/(?<=[.!?…])\s+/);
   if (sentences.length <= 2) return text;
-  // Return only first 2 meaningful sentences
   return sentences.slice(0, 2).join(' ').trim();
 }
 
-function fixReply(text) {
-  if (!text) return getRandomFallback();
+function fixReply(text, level = 0) {
+  if (!text) return getRandomFallback(level);
   text = stripDevanagari(text);
   const banned = ['sure', 'certainly', 'of course', "i'm sorry", 'i apologize', 'as an ai', '/nothink', 'absolutely'];
   for (let b of banned) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/, '');
   }
   text = stripDevanagari(text);
-  if (!text || text.length < 2) return getRandomFallback();
-  // Force "Suyash" - replace any pet names
+  if (!text || text.length < 2) return getRandomFallback(level);
   text = text.replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash').replace(/\bpillu\b/gi, 'suyash');
-  // Trim to max 2 lines
   text = trimToTwoLines(text);
   return text;
 }
@@ -221,25 +227,38 @@ const GROQ_MODEL = 'qwen/qwen3.8-27b';
 async function getAIReply(jid, userMsg) {
   addToHistory(jid, 'user', userMsg);
   const trigger = detectTrigger(userMsg);
+  const level = getAngerLevel(jid);
+
+  // Anger escalation - track short replies
+  if (trigger === 'short') {
+    increaseAnger(jid);
+  } else if (trigger === 'normal') {
+    // Sweet/long reply - slightly reduce anger
+    if (angerLevel[jid] > 0) angerLevel[jid]--;
+  }
 
   const extraMap = {
-    jealous:   '\nCRITICAL: Jealous rage. Ask who she is. MAX 2 SHORT lines. "suyash ti kon hoti sang."',
-    emotional: '\nCRITICAL: Emotional/hurt. MAX 2 SHORT lines. "suyash tu sadha busy asto mazhasathi.."',
-    short:     '\nCRITICAL: He gave 1 word reply. Get annoyed. MAX 1 SHORT line. "suyash itkach? seriously."',
+    jealous:   '\nCRITICAL: Jealous rage. "suyash ti kon hoti sang." MAX 2 SHORT lines.',
+    emotional: '\nCRITICAL: Hurt/emotional. "suyash tu sadha busy asto." MAX 2 SHORT lines.',
+    short:     '\nCRITICAL: Short reply received. Annoyed. MAX 1 SHORT line only.',
     normal:    '',
   };
+
+  // At max anger - very cold, very short
+  const maxAngerExtra = level >= 4 ?
+    '\nMAX ANGER MODE: Reply with ONLY 1-3 words. Cold silence. "suyash." or "fine." or "jau de." NOTHING MORE.' : '';
 
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: getSystemPrompt() + (extraMap[trigger] || '') }
+        { role: 'system', content: getSystemPrompt(level) + (extraMap[trigger] || '') + maxAngerExtra }
       ].concat(getHistory(jid)),
-      max_tokens: 60, // ← STRICT LOW LIMIT = short replies
+      max_tokens: level >= 4 ? 20 : 60, // Max anger = even shorter!
       temperature: 0.6,
     });
 
-    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
+    let reply = fixReply(res?.choices?.[0]?.message?.content?.trim(), level);
     reply = reply.toLowerCase()
       .replace(/^(shreya:|shreya\s*:|")\s*/i, '')
       .replace(/"$/, '')
@@ -251,17 +270,76 @@ async function getAIReply(jid, userMsg) {
     return reply;
   } catch (err) {
     console.error('[Groq Error]', err.message);
-    return getRandomFallback();
+    return getRandomFallback(level);
   }
+}
+
+// ─── FEATURE 1: DOUBLE/TRIPLE TEXTING ─────────────────────────────────────────
+const BURST_MSGS = {
+  jealous: [
+    ['suyash.', 'ti kon hoti sang mla atta.'],
+    ['suyash reply kar.', 'kuthay gelas tu?'],
+    ['suyash.', 'suyash.', 'bol na mla.'],
+  ],
+  angry: [
+    ['suyash itka vel.', 'seriously.'],
+    ['suyash.', 'tu mla ignore karto na.'],
+    ['suyash reply kar.', 'please.', 'suyash.'],
+  ],
+  crying: [
+    ['suyash.', 'mi radu lagley re.'],
+    ['suyash maza phone uth.', 'please ek da.'],
+  ],
+};
+
+async function sendDoubleBurst(sock, jid, type = 'angry') {
+  const pool = BURST_MSGS[type] || BURST_MSGS['angry'];
+  const msgs = pool[Math.floor(Math.random() * pool.length)];
+  for (let i = 0; i < msgs.length; i++) {
+    await new Promise(r => setTimeout(r, 2000 + Math.random() * 3000)); // 2-5s gap between burst msgs
+    try { await sock.sendPresenceUpdate('composing', jid); } catch(e) {}
+    await new Promise(r => setTimeout(r, 1500));
+    await sock.sendMessage(jid, { text: msgs[i] });
+    addToHistory(jid, 'assistant', msgs[i]);
+    console.log('[BURST] Sent: ' + msgs[i]);
+  }
+}
+
+// ─── FEATURE 2: SEEN BUT NO REPLY DRAMA ──────────────────────────────────────
+async function seenDrama(sock, jid, capturedMsg) {
+  console.log('[DRAMA] Seen but no reply for 15-20 min...');
+
+  // Read the message (blue ticks) - but no reply
+  try { await sock.readMessages([capturedMsg.key]); } catch(e) {}
+  await sock.sendPresenceUpdate('available', jid);
+
+  // After 15-20 minutes, send a cold angry message
+  const dramaDelay = (15 + Math.floor(Math.random() * 6)) * 60 * 1000; // 15-20 min
+
+  seenPending[jid] = setTimeout(async () => {
+    delete seenPending[jid];
+    const dramaReplies = [
+      'suyash seen kelas ani reply nai dilas. he kase karto tu.',
+      'suyash. seen kelas. mg nai bollas. ok.',
+      'suyash tu seen kartos ani ignore karto. mahit aahe mla.',
+      'suyash 20 min aadhi seen kelas. kon hota sobat?',
+    ];
+    const reply = dramaReplies[Math.floor(Math.random() * dramaReplies.length)];
+    addToHistory(jid, 'assistant', reply);
+    try { await sock.sendPresenceUpdate('composing', jid); } catch(e) {}
+    await new Promise(r => setTimeout(r, 3000));
+    await sock.sendMessage(jid, { text: reply });
+    console.log('[DRAMA] After seen: ' + reply);
+  }, dramaDelay);
 }
 
 // ─── PROACTIVE ────────────────────────────────────────────────────────────────
 const PROACTIVE_POOL = [
-  'Send ONE short angry line to Suyash. Call him SUYASH. Roman Marathi. MAX 1 line only.',
-  'Send ONE short emotional line saying you miss Suyash. Call him SUYASH. MAX 1 line.',
-  'Send ONE short possessive question to Suyash. Call him SUYASH. MAX 1 line.',
-  'Send ONE short hurt line. Call him SUYASH. MAX 1 line. Roman Marathi.',
-  'Send ONE short angry question asking why Suyash is not talking. MAX 1 line.',
+  'Send ONE short angry line to Suyash. Call him SUYASH. Roman Marathi. MAX 1 line.',
+  'Send ONE short emotional hurt line. Call him SUYASH. MAX 1 line.',
+  'Send ONE short possessive question. Call him SUYASH. MAX 1 line.',
+  'Send ONE short crying line. Call him SUYASH. MAX 1 line.',
+  'Send ONE short angry question. Call him SUYASH. MAX 1 line.',
 ];
 
 async function getProactiveMsg(jid) {
@@ -269,7 +347,7 @@ async function getProactiveMsg(jid) {
   try {
     const res = await groq.chat.completions.create({
       model: GROQ_MODEL,
-      messages: [{ role: 'system', content: getSystemPrompt() }]
+      messages: [{ role: 'system', content: getSystemPrompt(getAngerLevel(jid)) }]
         .concat(getHistory(jid).slice(-4))
         .concat([{ role: 'user', content: starter }]),
       max_tokens: 50,
@@ -281,7 +359,7 @@ async function getProactiveMsg(jid) {
       .replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash')
       .trim();
     return reply;
-  } catch(e) { return getRandomFallback(); }
+  } catch(e) { return getRandomFallback(getAngerLevel(jid)); }
 }
 
 function scheduleNextProactive(sock) {
@@ -290,13 +368,18 @@ function scheduleNextProactive(sock) {
   console.log('[Proactive] Next in ' + Math.round(delay / 60000) + ' min');
   proactiveTimer = setTimeout(async () => {
     if (lastActiveJid) {
-      const text = await getProactiveMsg(lastActiveJid);
-      addToHistory(lastActiveJid, 'assistant', text);
-      try { await sock.sendPresenceUpdate('composing', lastActiveJid); } catch(e) {}
-      await new Promise(r => setTimeout(r, 15000 + Math.random() * 10000));
-      await sock.sendMessage(lastActiveJid, { text });
-      try { await sock.sendPresenceUpdate('paused', lastActiveJid); } catch(e) {}
-      console.log('[Proactive] Sent: ' + text);
+      // 30% chance - double burst proactive
+      if (Math.random() < 0.30) {
+        await sendDoubleBurst(sock, lastActiveJid, 'angry');
+      } else {
+        const text = await getProactiveMsg(lastActiveJid);
+        addToHistory(lastActiveJid, 'assistant', text);
+        try { await sock.sendPresenceUpdate('composing', lastActiveJid); } catch(e) {}
+        await new Promise(r => setTimeout(r, 12000 + Math.random() * 8000));
+        await sock.sendMessage(lastActiveJid, { text });
+        try { await sock.sendPresenceUpdate('paused', lastActiveJid); } catch(e) {}
+        console.log('[Proactive] Sent: ' + text);
+      }
     }
     scheduleNextProactive(sock);
   }, delay);
@@ -380,13 +463,15 @@ async function startBot() {
       console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
     }
     if (connection === 'open') {
-      console.log('✅ DANGEROUS SAD GF MODE 😈 - Always Suyash, Always Short, Always Hurt');
+      console.log('✅ ULTIMATE DANGEROUS GF 😈 - Double Text + Anger Escalation + Seen Drama');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
     } else if (connection === 'close') {
       connectionStatus = 'disconnected';
       if (proactiveTimer) { clearTimeout(proactiveTimer); proactiveTimer = null; }
+      // Clear seen drama timers
+      Object.values(seenPending).forEach(t => clearTimeout(t));
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code !== DisconnectReason.loggedOut) {
         console.log('[WA] Reconnecting...');
@@ -406,7 +491,7 @@ async function startBot() {
         if (msg.key?.fromMe) continue;
         const jid = msg.key?.remoteJid;
         if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue;
-        if (jid.split('@')[0] !== TARGET_NUMBER) continue; // ← ONLY target number!
+        if (jid.split('@')[0] !== TARGET_NUMBER) continue;
 
         if (msg.key.id) {
           if (processedMsgs.has(msg.key.id)) continue;
@@ -422,6 +507,12 @@ async function startBot() {
         console.log('[Suyash]: ' + text);
         lastActiveJid = jid;
 
+        // Cancel pending seen drama if he replied
+        if (seenPending[jid]) {
+          clearTimeout(seenPending[jid]);
+          delete seenPending[jid];
+        }
+
         await reactToMsg(sock, msg);
 
         if (msgBuffer[jid]) {
@@ -435,13 +526,34 @@ async function startBot() {
           msgBuffer[capturedJid].timer = setTimeout(async () => {
             const combined = msgBuffer[capturedJid].msgs.join(' ');
             delete msgBuffer[capturedJid];
+
+            // ── FEATURE 3: SEEN DRAMA (12% chance) ──
+            if (Math.random() < 0.12) {
+              await seenDrama(sock, capturedJid, capturedMsg);
+              return; // Don't reply now - drama will reply after 15-20 min
+            }
+
             try { await sock.readMessages([capturedMsg.key]); } catch(e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch(e) {}
             await randomDelay(22000, 38000);
-            const replyText = await getAIReply(capturedJid, combined);
-            try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
-            await sock.sendMessage(capturedJid, { text: replyText });
-            console.log('[Shreya]: ' + replyText);
+
+            const trigger = detectTrigger(combined);
+            const level = getAngerLevel(capturedJid);
+
+            // ── FEATURE 1: DOUBLE TEXTING (25% chance, more if jealous/angry) ──
+            const burstChance = trigger === 'jealous' ? 0.50 : trigger === 'short' ? 0.40 : 0.25;
+            if (Math.random() < burstChance) {
+              try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
+              const burstType = trigger === 'jealous' ? 'jealous' : level >= 3 ? 'angry' : 'angry';
+              await sendDoubleBurst(sock, capturedJid, burstType);
+            } else {
+              // Normal single reply
+              const replyText = await getAIReply(capturedJid, combined);
+              try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
+              await sock.sendMessage(capturedJid, { text: replyText });
+              console.log('[Shreya]: ' + replyText);
+            }
+
             try { await sock.sendPresenceUpdate('unavailable', capturedJid); } catch(e) {}
           }, BUFFER_WAIT);
         })(jid, msg);
