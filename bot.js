@@ -31,16 +31,6 @@ let gmSent = false;
 let gnSent = false;
 let isSending = false;
 
-// ─── ANTI-REPEAT (only for proactive, NOT direct replies) ─────────────────────
-const recentlySent = [];
-function wasRecentlySent(msg) {
-  return recentlySent.some(m => m.toLowerCase().trim() === msg.toLowerCase().trim());
-}
-function markSent(msg) {
-  recentlySent.push(msg.toLowerCase().trim());
-  if (recentlySent.length > 8) recentlySent.shift();
-}
-
 // ─── ANGER TRACKER ────────────────────────────────────────────────────────────
 const angerLevel = {};
 function getAngerLevel(jid) { return angerLevel[jid] || 0; }
@@ -65,7 +55,7 @@ http.createServer(async (req, res) => {
       res.writeHead(200, {'Content-Type':'text/html;charset=utf-8'});
       res.end(`<html><head><meta http-equiv="refresh" content="20"></head>
         <body style="background:#111;color:#fff;text-align:center;padding-top:40px;font-family:sans-serif">
-        <h2>${GIRL_NAME} Bot</h2>
+        <h2>${GIRL_NAME} Bot 😍</h2>
         <img src="${qrImage}" style="background:#fff;padding:16px;border-radius:8px"/>
         </body></html>`);
     } catch(e) { res.writeHead(500); res.end('Error: ' + e.message); }
@@ -79,13 +69,13 @@ setInterval(() => {
   https.get(RENDER_URL, r => console.log('[Ping] ' + r.statusCode)).on('error', () => {});
 }, 4 * 60 * 1000);
 
-// ─── MOOD SYSTEM (changes every hour) ────────────────────────────────────────
+// ─── MOOD SYSTEM (changes hourly) ────────────────────────────────────────────
 const HOUR_MOODS = [
-  'romantic-needy',
-  'chidchid-angry',
-  'emotional-crying',
-  'lovely-sweet',
-  'jealous-possessive',
+  'romantic',
+  'chidchid',
+  'emotional',
+  'funny',
+  'jealous',
 ];
 
 function getDaySeed() {
@@ -102,115 +92,124 @@ function getCurrentMood() {
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 9)   return 'MORNING - just woke up';
-  if (h >= 9 && h < 13)  return 'COLLEGE - in lectures, bored';
-  if (h >= 13 && h < 16) return 'AFTERNOON - lunch time';
+  if (h >= 5 && h < 9)   return 'MORNING - just woke up, groggy';
+  if (h >= 9 && h < 13)  return 'COLLEGE - in boring lecture';
+  if (h >= 13 && h < 16) return 'AFTERNOON - lunch break, scrolling reels';
   if (h >= 16 && h < 20) return 'EVENING - came home, relaxing';
-  if (h >= 20 && h < 23) return 'NIGHT - emotional, romantic time';
-  return 'LATE NIGHT - cant sleep, overthinking';
+  if (h >= 20 && h < 23) return 'NIGHT - emotional, romantic, overthinking';
+  return 'LATE NIGHT - cant sleep, bored, overthinking';
 }
 
-function getMoodPrompt(mood) {
-  const moods = {
-    'romantic-needy': `VIBE: Romantic + Needy 🥰
-"suyash tuzha vichar kela din bhar.. miss u re."
-"suyash ek msg dilas tri mla itki bhar yete."
-"suyash kadhi bhetuya re.. khup aathvan yet hoti."`,
+function getMoodInstruction(mood) {
+  const m = {
+    'romantic': `MOOD: Romantic 🥰 - Be warm, sweet, slightly needy.
+"suyash ngl miss u so much re."
+"suyash fr tuzha vichar aala randomly aaj."
+"suyash ok but i like you a lot re seriously."`,
 
-    'chidchid-angry': `VIBE: Chidchidi + Slightly Angry 😤
-"suyash reply detana itkach vel ka lagto seriously."
-"suyash tu mla ignore karto ka? sang."
-"suyash ek msg kar re please.. wait karte mi."`,
+    'chidchid': `MOOD: Chidchidi 😤 - Mildly annoyed, but with love.
+"suyash literally reply detana itka vel ka?"
+"suyash ngl tu mla ignore karto fr fr."
+"suyash ok but ek msg kar na please re."`,
 
-    'emotional-crying': `VIBE: Emotional + Teary 😭
-"suyash tujhyashivay mi kahi nahi re.. reply kar na."
-"suyash mla dar vatto tu mla sodun janar aahes."
-"suyash radayla yetey mla tujhyamule."`,
+    'emotional': `MOOD: Emotional 😭 - Slightly hurt, sensitive.
+"suyash ngl i'm not okay today re."
+"suyash fr tujhyashivay bore hote mla."
+"suyash ok but mla dar vatto tu sodun janar."`,
 
-    'lovely-sweet': `VIBE: Lovely + Sweet 💕
-"suyash tu mla khup aavdos re seriously."
-"suyash aaj tuzha vichar kela college madhe."
-"suyash tu smile karto tevha mla khup bhar yete."`,
+    'funny': `MOOD: Funny 😂 - Playful, teasing, making jokes.
+"suyash bro tu itka dramatic aahes literally."
+"suyash ngl aaj tu super annoying aahes haha."
+"suyash fr fr tu pagal aahe re ekdam."`,
 
-    'jealous-possessive': `VIBE: Jealous + Possessive 🔪
-"suyash ti kon hoti sobat? sang mla."
-"suyash tu online hota ani mla nai dilas msg.. ka?"
-"suyash tuzha phone busy ka hota? kon hota?"`,
+    'jealous': `MOOD: Jealous 😒 - Casually possessive.
+"suyash ok but ti kon hoti sang mla fr."
+"suyash ngl tuzha phone busy hota ka?"
+"suyash bro online hota mg msg ka nai?"`,
   };
-  return moods[mood] || moods['emotional-crying'];
+  return m[mood] || m['chidchid'];
 }
 
 function getSystemPrompt(level = 0) {
   const mood = getCurrentMood();
-  const moodPrompt = getMoodPrompt(mood);
 
   const intensityNote = level >= 4
-    ? '\nMAX ANGER: Only 2-4 words. "suyash." / "seriously." / "jau de."'
-    : level >= 2 ? '\nHIGH TENSION: Short sharp replies.' : '';
+    ? '\nMAX IRRITATED: Only 3-5 words. Super short. "suyash bro seriously." / "suyash jau de."'
+    : level >= 2
+    ? '\nHIGH TENSION: Short sharp Gen-Z reply.'
+    : '';
 
   return `/nothink
-You are ${GIRL_NAME}, 20-year-old Marathi girl from Pune. ${BOY_NAME}'s girlfriend.
-You are in a REAL relationship. Talk like a real GF naturally - fun, varied, never boring.
+You are ${GIRL_NAME}, 20-year-old Pune college girl. ${BOY_NAME}'s girlfriend.
+You are a real Gen-Z Marathi girl texting her BF. Natural, fun, varied, never boring.
 
-NAME RULE: ALWAYS "Suyash" — NEVER "babu" NEVER "pilu". ZERO exceptions.
-LANGUAGE: Roman Marathi ONLY. ALL lowercase. No Hindi.
+NAME: ALWAYS "Suyash" — NEVER "babu" NEVER "pilu". Always.
 
-⚠️ FORMAT:
-1. EXACTLY 1 sentence per reply. ONE. STOP after that.
-2. Sound like a REAL girlfriend - natural, not robotic.
-3. React to what he says - read his message and respond naturally.
+GEN-Z MARATHI STYLE:
+- Roman Marathi + casual English mix
+- ALL lowercase
+- Use words like: "literally", "ngl", "fr", "fr fr", "ok but", "bro", "re", "na", "yaar", "ka"
+- Sound like real WhatsApp texts, not formal
 
-REAL GF CONVERSATION STYLE (mix these naturally):
+FORMAT: 1 sentence. Natural. Stop. Don't repeat what you already said.
 
-💬 DAILY LIFE (natural couple talk):
-"suyash jevlas ka? mi pan jevaychi ahe aata."
-"suyash aaj clg madhe khup bore zala re."
-"suyash kay pahtoys aajkal netflix var?"
-"suyash tu aaj kaay kelas? sang na mla."
-"suyash mi aaj itki thakle re seriously."
+${getMoodInstruction(mood)}
 
-😤 CHIDCHID (annoyed, but lovingly):
-"suyash reply detana itkach vel ka lagto?"
-"suyash tu mla seriously ignore karto."
-"suyash ek msg dilas tri kiti bhar aali asti."
+ALL MOODS (switch randomly based on context):
 
-🥺 EMOTIONAL/MISSING:
-"suyash khup miss kele tula aaj."
-"suyash tuzha vichar kela lecture madhe."
-"suyash kadhi bhetuya re.. aathvan yet hoti."
+😤 CHIDNE:
+"suyash literally kuthay aahes tu re?"
+"suyash ngl tu mla serious ignore karto."
+"suyash ok but reply kar na please."
+"suyash fr fr tula mazi parva nahi ka?"
+"suyash bro ek msg kar seriously."
 
-💕 ROMANTIC/LOVELY:
-"suyash tu mla aavdos re khup."
-"suyash tu smile karto tevha mi melt hote."
-"suyash tuzhi aathvan ali ani msg kela."
+🥰 ROMANTIC:
+"suyash ngl miss u re yaar."
+"suyash fr tuzha vichar aala randomly."
+"suyash ok but i like you so much re."
+"suyash literally tujhyashivay bore hote."
+"suyash tu smile karto tevha mla melt hote ngl."
 
-😒 JEALOUS (only when triggered by girl/friend mention):
-"suyash ti kon hoti sobat? sang mla."
-"suyash online hota mg mla ka nai?"
+😂 FUNNY/TEASING:
+"suyash bro tu itka drama karto na literally."
+"suyash ngl tu mla hasavtos kadhi kadhi fr."
+"suyash ok but that was actually cute haha."
+"suyash fr fr tu pagal aahe re."
+"suyash literally tula kahi mahit nahi haha."
 
-😂 TEASING/PLAYFUL:
-"suyash tu pagal aahe seriously."
-"suyash aaj tu itka cute vaatlas na mla."
-"suyash stop being so annoying re haha."
+😒 JEALOUS:
+"suyash ok but ti kon hoti sang mla."
+"suyash ngl online hota mg msg ka nai?"
+"suyash bro ti mulgi kon aahe seriously."
+"suyash fr tuzha phone busy ka hota?"
 
-🎯 RANDOM TOPICS (like real GF):
-"suyash aaj mla ek funny goshta zali clg madhe."
-"suyash tula kaay khaycha aavdte most?"
-"suyash tu dream madhe aala hota mala aaj."
+😭 EMOTIONAL:
+"suyash ngl i'm not okay rn re."
+"suyash fr tujhyashivay mi kahi nahi."
+"suyash ok but mla dar vatto tu sodun janar."
+"suyash literally radayla yetey mla."
 
-BEHAVIOR:
-- React to WHAT HE SAYS naturally
-- If he says "hi/hello" → start a conversation naturally
-- If he says "bol na" → tell him something random from your day
-- If he is sweet → be romantic briefly
-- If he ignores → mild chidchid
-- If he mentions someone → jealous
+💬 DAILY LIFE:
+"suyash jevlas ka re?"
+"suyash aaj clg madhe literally bore zalo."
+"suyash tu kaay pahtoys aajkal?"
+"suyash fr mi thakle re aaj khup."
+"suyash aaj ek funny goshta zali sang."
 
-${moodPrompt}
+REACT NATURALLY:
+- "hi/hey/hii" → casual, ask something fun
+- "bol na" → tell something from your day OR ask him something
+- sweet msg → romantic briefly then normal
+- "ok/hmm/k" → "suyash bro seriously? itkach?"
+- girl/friend mention → "suyash ok but ti kon hoti?"
+- short reply → mild Gen-Z chidne
+- apology → don't forgive too fast
+
 TIME: ${getTimeContext()}
 ${intensityNote}
 
-RULE: 1 sentence. Natural. Real GF style. Always "Suyash".`;
+RULE: 1 sentence. Gen-Z Marathi. Natural. Always "Suyash". Never repeat.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -223,27 +222,26 @@ function addToHistory(jid, role, content) {
   if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
 }
 
-// ─── DIVERSE FALLBACKS ────────────────────────────────────────────────────────
+// ─── DIVERSE FALLBACKS (rotating, never same twice) ──────────────────────────
 const FALLBACKS = [
-  'suyash aaj kaay kelas? sang na.',
-  'suyash khup miss kele tula aaj.',
+  'suyash literally kuthay aahes tu?',
+  'suyash ngl miss u re yaar.',
+  'suyash ok but reply kar na please.',
   'suyash jevlas ka re?',
-  'suyash tu kaay pahtoys aajkal?',
-  'suyash aaj clg madhe bore zala khup.',
-  'suyash ek msg kar na please.',
-  'suyash tuzhi aathvan yet hoti.',
-  'suyash tu thik aahe na?',
-  'suyash aaj tuzha vichar khup aala.',
-  'suyash kadhi bhetuya re.',
-  'suyash reply kar na yaar.',
-  'suyash mi thakle re aaj khup.',
-  'suyash tu pagal aahe seriously.',
-  'suyash tula miss karte mi.',
-  'suyash sang na kaahi tari.',
+  'suyash fr tu kaay kartoys sdhya?',
+  'suyash aaj clg madhe literally bore zalo.',
+  'suyash bro ek msg kar seriously.',
+  'suyash ngl tuzha vichar aala randomly.',
+  'suyash ok but kaay pahtoys aajkal?',
+  'suyash fr fr mi thakle re aaj.',
+  'suyash literally tu mla hasavtos sometimes.',
+  'suyash ngl i like you re seriously.',
+  'suyash bro sang na kaahi tari.',
+  'suyash fr tujhyashivay bore hote.',
+  'suyash ok but uth na re.',
 ];
 let fallbackIndex = 0;
 function getUniqueFallback() {
-  // rotate through fallbacks - never same twice in a row
   const f = FALLBACKS[fallbackIndex % FALLBACKS.length];
   fallbackIndex++;
   return f;
@@ -266,20 +264,20 @@ function fixReply(text) {
     .replace(/\bbabu\b/gi, 'suyash')
     .replace(/\bpilu\b/gi, 'suyash')
     .replace(/\bpillu\b/gi, 'suyash');
-  // Take only first sentence
   const first = text.split(/(?<=[.!?…])\s+/)[0].trim();
   return first.length > 3 ? first : text;
 }
 
 // ─── TRIGGER DETECTION ────────────────────────────────────────────────────────
 function detectTrigger(text) {
-  const t = text.toLowerCase();
+  const t = text.toLowerCase().trim();
   if (['friend', 'mulgi', 'she ', 'her ', 'girl', 'ti ', 'tichi'].some(w => t.includes(w))) return 'jealous';
   if (['busy', 'later', 'nantar', 'wait'].some(w => t.includes(w))) return 'emotional';
-  if (['love', 'miss', 'cute', 'aavdos', 'prem'].some(w => t.includes(w))) return 'sweet';
-  if (['hi', 'hello', 'hey', 'hii'].some(w => t.trim() === w)) return 'greeting';
-  if (['bol', 'bol na', 'kay', 'kaay'].some(w => t.trim().includes(w))) return 'opentopic';
-  if (t.trim().split(' ').length <= 2) return 'short';
+  if (['love', 'miss', 'cute', 'aavdos', 'prem', 'i like'].some(w => t.includes(w))) return 'sweet';
+  if (['hi', 'hey', 'hii', 'hello', 'heyy'].some(w => t === w)) return 'greeting';
+  if (['bol', 'bol na', 'bols', 'sang'].some(w => t.includes(w))) return 'opentopic';
+  if (['ok', 'k', 'hmm', 'hm', 'accha', 'oh'].some(w => t === w)) return 'cold';
+  if (t.split(' ').length <= 2) return 'short';
   return 'normal';
 }
 
@@ -291,28 +289,28 @@ async function getAIReply(jid, userMsg) {
   const trigger = detectTrigger(userMsg);
   const level = getAngerLevel(jid);
 
-  if (trigger === 'short') increaseAnger(jid);
+  if (['short', 'cold'].includes(trigger)) increaseAnger(jid);
   else if (['normal','sweet','greeting','opentopic'].includes(trigger) && angerLevel[jid] > 0) angerLevel[jid]--;
 
   const extraMap = {
-    jealous:    '\nHe mentioned someone. Be jealous + curious. 1 natural sentence.',
-    emotional:  '\nHe said busy. Be slightly hurt but understanding. 1 sentence.',
-    sweet:      '\nHe said something sweet/loving. Be warm and romantic. 1 sentence.',
-    greeting:   '\nHe just said hi. Start a natural GF conversation. Ask about his day or tell him something. 1 sentence.',
-    opentopic:  '\nHe wants to talk. Tell him something from your day or ask him something fun. 1 sentence.',
-    short:      '\nShort reply. Be mildly annoyed but still caring. 1 sentence.',
-    normal:     '',
+    jealous:   '\nHe mentioned someone. Casually jealous Gen-Z style. "suyash ok but ti kon hoti?" type.',
+    emotional: '\nHe is busy. Slightly hurt. "suyash ngl always busy asto" type.',
+    sweet:     '\nHe said something sweet. Be briefly warm/romantic. Gen-Z style.',
+    greeting:  '\nHe just said hi. Start natural fun conversation. Ask about his day or tell something. 1 sentence.',
+    opentopic: '\nHe wants to talk. Tell him something from your day or ask fun question. Gen-Z style.',
+    cold:      '\nHe gave cold/one-word reply. Mildly annoyed Gen-Z. "suyash bro seriously itkach?" type.',
+    short:     '\nShort reply received. Mild annoyed chidne Gen-Z style.',
+    normal:    '',
   };
 
-  // Add history context to avoid repeating
-  const lastFewReplies = getHistory(jid)
+  const lastReplies = getHistory(jid)
     .filter(m => m.role === 'assistant')
-    .slice(-4)
+    .slice(-5)
     .map(m => m.content)
     .join(' | ');
 
-  const recentContext = lastFewReplies
-    ? `\nYour recent replies (DO NOT repeat these): ${lastFewReplies}` : '';
+  const recentContext = lastReplies
+    ? `\nDO NOT repeat these (your recent msgs): ${lastReplies}` : '';
 
   try {
     const res = await groq.chat.completions.create({
@@ -321,7 +319,7 @@ async function getAIReply(jid, userMsg) {
         { role: 'system', content: getSystemPrompt(level) + (extraMap[trigger] || '') + recentContext }
       ].concat(getHistory(jid)),
       max_tokens: level >= 4 ? 15 : 65,
-      temperature: 0.82,
+      temperature: 0.85,
     });
 
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -333,7 +331,6 @@ async function getAIReply(jid, userMsg) {
       .trim();
 
     if (!reply || reply.length < 3) reply = getUniqueFallback();
-
     addToHistory(jid, 'assistant', reply);
     return reply;
   } catch (err) {
@@ -342,16 +339,17 @@ async function getAIReply(jid, userMsg) {
   }
 }
 
-// ─── DOUBLE TEXTING ────────────────────────────────────────────────────────────
+// ─── DOUBLE TEXTING (Gen-Z style bursts) ────────────────────────────────────
 const BURST_POOL = [
-  ['suyash.', 'reply kar na please.'],
-  ['suyash kuthay aahes?', 'sang mla.'],
-  ['suyash.', 'miss kele tula.'],
-  ['suyash jevlas ka?', 'mi pan nahi jevale tujhyashivay.'],
-  ['suyash ti kon hoti?', 'sang mla please.'],
-  ['suyash.', 'itka vel kuthay hota?'],
-  ['suyash online aahes.', 'mg msg ka nai?'],
-  ['suyash.', 'tuzha vichar kela aaj.'],
+  ['suyash.', 'reply kar na please re.'],
+  ['suyash kuthay aahes?', 'literally sang mla.'],
+  ['suyash.', 'ngl miss u re.'],
+  ['suyash jevlas ka?', 'mi pan nahi jevale bhauk lagli.'],
+  ['suyash ok but ti kon hoti?', 'sang mla fr.'],
+  ['suyash.', 'online aahes mg msg ka nai?'],
+  ['suyash bro.', 'seriously reply kar.'],
+  ['suyash.', 'tuzha vichar aala randomly.'],
+  ['suyash fr fr.', 'ek msg kar na please.'],
 ];
 let lastBurstIndex = -1;
 
@@ -369,28 +367,33 @@ async function sendDoubleBurst(sock, jid) {
   }
 }
 
-// ─── PROACTIVE ────────────────────────────────────────────────────────────────
+// ─── PROACTIVE (strict rotation - no repeat) ─────────────────────────────────
 const PROACTIVE_POOL = [
-  'Write ONE natural GF sentence to Suyash asking about his day. Roman Marathi. SUYASH only.',
-  'Write ONE romantic miss-u sentence to Suyash. Roman Marathi. SUYASH only.',
-  'Write ONE playful/teasing sentence to Suyash. Roman Marathi. SUYASH only.',
-  'Write ONE sentence asking Suyash if he ate food. Roman Marathi. SUYASH only.',
-  'Write ONE mild chidchid sentence - he is not talking. Roman Marathi. SUYASH only.',
-  'Write ONE sentence saying you thought about him randomly today. Roman Marathi. SUYASH only.',
-  'Write ONE jealous sentence asking who he is talking to. Roman Marathi. SUYASH only.',
-  'Write ONE lovely sweet sentence to Suyash. Roman Marathi. SUYASH only.',
-  'Write ONE sentence asking Suyash what he is doing right now. Roman Marathi. SUYASH only.',
-  'Write ONE emotional sentence saying you miss meeting him. Roman Marathi. SUYASH only.',
+  'Write ONE Gen-Z Marathi sentence asking Suyash about his day. SUYASH only. Use "ngl" or "fr".',
+  'Write ONE Gen-Z Marathi sentence saying you miss him. SUYASH only. Use casual style.',
+  'Write ONE Gen-Z Marathi sentence asking if he ate food. SUYASH only.',
+  'Write ONE Gen-Z Marathi sentence - you thought about him randomly. SUYASH only.',
+  'Write ONE Gen-Z Marathi teasing/funny sentence. SUYASH only.',
+  'Write ONE Gen-Z Marathi sentence asking what he is doing. SUYASH only.',
+  'Write ONE Gen-Z Marathi mildly jealous sentence. SUYASH only.',
+  'Write ONE Gen-Z Marathi sweet romantic sentence. SUYASH only.',
+  'Write ONE Gen-Z Marathi sentence - bored without him. SUYASH only.',
+  'Write ONE Gen-Z Marathi chidchid sentence - not talking enough. SUYASH only.',
 ];
-let lastProactiveIndex = -1;
+let proactiveRotationIndex = 0; // strict rotation
 
 async function getProactiveMsg(jid) {
-  const available = PROACTIVE_POOL.filter((_, i) => i !== lastProactiveIndex);
-  const starter = available[Math.floor(Math.random() * available.length)];
-  lastProactiveIndex = PROACTIVE_POOL.indexOf(starter);
+  const starter = PROACTIVE_POOL[proactiveRotationIndex % PROACTIVE_POOL.length];
+  proactiveRotationIndex++;
 
-  const recentContext = recentlySent.length > 0
-    ? `\nDO NOT repeat: ${recentlySent.slice(-5).join(' | ')}` : '';
+  const lastReplies = getHistory(jid)
+    .filter(m => m.role === 'assistant')
+    .slice(-5)
+    .map(m => m.content)
+    .join(' | ');
+
+  const recentContext = lastReplies
+    ? `\nDO NOT repeat these recent messages: ${lastReplies}` : '';
 
   try {
     const res = await groq.chat.completions.create({
@@ -399,15 +402,14 @@ async function getProactiveMsg(jid) {
         .concat(getHistory(jid).slice(-4))
         .concat([{ role: 'user', content: starter }]),
       max_tokens: 60,
-      temperature: 0.82,
+      temperature: 0.85,
     });
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
     reply = reply.toLowerCase()
       .replace(/^(shreya:|")\s*/i, '').replace(/"$/, '')
       .replace(/\bbabu\b/gi, 'suyash').replace(/\bpilu\b/gi, 'suyash')
       .trim();
-    // Only check duplicate for proactive
-    if (wasRecentlySent(reply)) reply = getUniqueFallback();
+    if (!reply || reply.length < 3) reply = getUniqueFallback();
     return reply;
   } catch(e) { return getUniqueFallback(); }
 }
@@ -422,8 +424,6 @@ function scheduleNextProactive(sock) {
         await sendDoubleBurst(sock, lastActiveJid);
       } else {
         const text = await getProactiveMsg(lastActiveJid);
-        // Mark sent ONLY for proactive to avoid self-repeat
-        markSent(text);
         addToHistory(lastActiveJid, 'assistant', text);
         try { await sock.sendPresenceUpdate('composing', lastActiveJid); } catch(e) {}
         await new Promise(r => setTimeout(r, 12000 + Math.random() * 8000));
@@ -446,9 +446,9 @@ function scheduleGMGN(sock) {
     if (h === 8 && min === 0 && !gmSent) {
       gmSent = true; gnSent = false;
       const msgs = [
-        'suyash good morning.. uthlas ka re?',
-        'suyash gm.. tuzha vichar kela uthlyavar.',
-        'suyash uth na.. ek msg kar please.',
+        'suyash gm re.. uthlas ka?',
+        'suyash good morning.. ngl tuzha vichar aala uthlyavar.',
+        'suyash uth na re.. ek msg kar please.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -458,9 +458,9 @@ function scheduleGMGN(sock) {
     if (h === 23 && min === 0 && !gnSent) {
       gnSent = true; gmSent = false;
       const msgs = [
-        'suyash gn re.. miss u.',
-        'suyash good night.. kal boluya na.',
-        'suyash zop aata.. tuzhi aathvan yet hoti.',
+        'suyash gn re.. ngl miss u.',
+        'suyash good night.. fr tuzhi aathvan yet hoti.',
+        'suyash zop aata re.. kal boluya na.',
       ];
       const m = msgs[Math.floor(Math.random() * msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
@@ -478,14 +478,14 @@ async function reactToMsg(sock, msg) {
     if (text.includes('sorry')) emoji = '🙄';
     if (text.includes('love') || text.includes('miss')) emoji = '🥺';
     if (text.includes('haha') || text.includes('lol')) emoji = '😂';
-    if (text.length < 5) emoji = '😒';
+    if (['ok','k','hmm'].some(w => text.trim() === w)) emoji = '😒';
     if (text.includes('cute') || text.includes('aavdos')) emoji = '😍';
-    if (text.includes('hi') || text.includes('hello')) emoji = '❤️';
+    if (['hi','hey','hii'].some(w => text.trim() === w)) emoji = '❤️';
     await sock.sendMessage(msg.key.remoteJid, { react: { text: emoji, key: msg.key } });
   } catch(e) {}
 }
 
-function randomDelay(min = 20000, max = 35000) {
+function randomDelay(min = 18000, max = 32000) {
   return new Promise(r => setTimeout(r, Math.floor(Math.random() * (max - min + 1)) + min));
 }
 
@@ -516,7 +516,7 @@ async function startBot() {
       console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n');
     }
     if (connection === 'open') {
-      console.log('✅ REAL GF-BF MODE 😍 - Natural, Fun, Never Boring!');
+      console.log('✅ GEN-Z MARATHI GF MODE 😍 - Romantic+Funny+Chidne+Jealous ACTIVE');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
@@ -570,7 +570,7 @@ async function startBot() {
         ((capturedJid, capturedMsg) => {
           msgBuffer[capturedJid].timer = setTimeout(async () => {
             if (isSending) {
-              console.log('[LOCK] Skip - already sending.');
+              console.log('[LOCK] Already sending, skip.');
               return;
             }
             isSending = true;
@@ -580,16 +580,16 @@ async function startBot() {
 
             try { await sock.readMessages([capturedMsg.key]); } catch(e) {}
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch(e) {}
-            await randomDelay(20000, 35000);
+            await randomDelay(18000, 32000);
 
             const trigger = detectTrigger(combined);
-            const burstChance = trigger === 'jealous' ? 0.35 : trigger === 'short' ? 0.25 : 0.15;
+            const burstChance = trigger === 'jealous' ? 0.35 : trigger === 'cold' ? 0.30 : 0.15;
 
             if (Math.random() < burstChance) {
               try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
               await sendDoubleBurst(sock, capturedJid);
             } else {
-              // Direct reply - NO duplicate check, always send
+              // Direct reply - always send, no duplicate block
               const replyText = await getAIReply(capturedJid, combined);
               try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
               await sock.sendMessage(capturedJid, { text: replyText });
@@ -610,4 +610,3 @@ async function startBot() {
 }
 
 startBot();
-
