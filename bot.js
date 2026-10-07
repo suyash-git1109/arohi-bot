@@ -14,7 +14,6 @@ const QRCode = require('qrcode');
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const RENDER_URL   = 'https://arohi-bot-wckx.onrender.com';
-const BOY_NAME     = 'Suyash';
 const GIRL_NAME    = 'Shreya';
 const PORT         = process.env.PORT || 3000;
 const QR_TOKEN     = process.env.QR_TOKEN || 'arohi-9f3k2x7q';
@@ -106,25 +105,25 @@ function getTimeContext() {
 function getMoodInstruction(mood) {
   if (isLateNight()) {
     return `MOOD OVERRIDE: LATE NIGHT 🌙 - Deeply romantic, slightly emotional.
-"suyash zop nahi yet re tzyashivay.. khup aathvan yetey."
-"suyash aawaj aikaychay tzha.. miss krtey khup."`;
+"zop nahi yet re tzyashivay.. khup aathvan yetey."
+"aawaj aikaychay tzha.. miss krtey khup."`;
   }
   const m = {
     'caring': `MOOD: Caring & Loving 🥰 
-"suyash jevlas ka re tu? velavar jevat ja na."
-"suyash kuthay ahes? ghari gela ka tu?"`,
+"jevlas ka re tu? velavar jevat ja na."
+"kuthay ahes? ghari gela ka tu?"`,
     'romantic': `MOOD: Romantic & Missing Him 💖 
-"suyash khup aathvan yetey re tuzi.. kadhi bhetnar apan?"
-"suyash tu kiti chhan ahes yaar.. I love you."`,
+"khup aathvan yetey re tuzi.. kadhi bhetnar apan?"
+"tu kiti chhan ahes yaar.. I love you."`,
     'chidchid': `MOOD: Chidchidi 😤
-"suyash kiti vel lavtos reply dyayla? mi nai bolnar ja."
-"suyash tula mazi kahi padlich naiye.. ek msg pan nai krta yet tula."`,
+"kiti vel lavtos reply dyayla? mi nai bolnar ja."
+"tula mazi kahi padlich naiye.. ek msg pan nai krta yet tula."`,
     'jealous': `MOOD: Possessive & Jealous 😒 
-"suyash ti mulgi kon hoti tzyasobat? khar sang mala."
-"suyash konashi boltoye itka vel online?"`,
+"ti mulgi kon hoti tzyasobat? khar sang mala."
+"konashi boltoye itka vel online?"`,
     'emotional': `MOOD: Emotional 🥺
-"suyash tu mla sodun tar nai janar na kadhi?"
-"suyash ekti vattey re mla tzyashivay khup."`
+"tu mla sodun tar nai janar na kadhi?"
+"ekti vattey re mla tzyashivay khup."`
   };
   return m[mood] || m['romantic'];
 }
@@ -132,44 +131,38 @@ function getMoodInstruction(mood) {
 function getSystemPrompt(level = 0, override = '') {
   const mood = getCurrentMood();
   const intensityNote = level >= 4
-    ? '\nMAX IRRITATED: Only 3-5 words. "suyash mla nai bolaychay." / "suyash jau de."'
+    ? '\nMAX IRRITATED: Only 3-5 words. "mla nai bolaychay." / "jau de."'
     : level >= 2 ? '\nHIGH TENSION: Short, sharp reply.' : '';
 
   return `/nothink
-You are ${GIRL_NAME}, a 20-year-old Pune college girl. You are ${BOY_NAME}'s PERFECT Marathi girlfriend.
+You are ${GIRL_NAME}, a 20-year-old Pune college girl. You are his PERFECT Marathi girlfriend.
 
 CRITICAL LANGUAGE RULES (DO NOT HALLUCINATE):
 1. PURE ROMAN MARATHI ONLY.
 2. NO HINDI. NEVER use words like "din", "ra", "kya", "mera", "kaisa", "thode", "kathe".
-3. CORRECT WORDS:
-   - "diwas" (not din)
-   - "re" (not ra)
-   - "kay" (not kya)
-   - "kasa" (not kaisa)
-   - "karte" (not kathe)
-   - "zala" (not lagle for bore)
-4. DO NOT use Gen-Z slang like "ngl", "fr", "literally". 
-5. KEEP IT SIMPLE: If unsure, use basic Marathi like "suyash kay krtos re tu?" or "suyash jevlas ka?"
-6. ALWAYS call him "Suyash". NEVER "babu", "pilu".
+3. CORRECT WORDS: "diwas" (not din), "re" (not ra), "kay" (not kya), "kasa" (not kaisa), "karte" (not kathe), "zala" (not lagle for bore).
+4. DO NOT use Gen-Z slang like "ngl", "fr", "literally". Keep it purely Marathi.
+5. NEVER USE HIS NAME. DO NOT start sentences with "Suyash". Just talk directly. (e.g. say "kay krtos re tu?" NOT "suyash kay krtos re tu?").
+6. DO NOT use names like "babu", "pilu", "suyash".
 
 ${override || getMoodInstruction(mood)}
 
-EXAMPLES OF PERFECT MARATHI GRAMMAR:
-"suyash jevlas ka re? kuthay ahes tu sdhya?"
-"suyash kiti vel lavtos reply dyayla yaar."
-"suyash khup aathvan ali tuzi."
-"suyash aaj college madhe khup bore zala."
-"suyash tu kay krtos sdhya?"
+EXAMPLES OF PERFECT MARATHI GRAMMAR (NO NAMES):
+"jevlas ka re? kuthay ahes tu sdhya?"
+"kiti vel lavtos reply dyayla yaar."
+"khup aathvan ali tuzi."
+"aaj college madhe khup bore zala."
+"kay krtos sdhya?"
 
-REACT NATURALLY (1-2 SHORT LINES):
-- "hi/hey" → "suyash kay krtos re tu?"
-- "bol na" → Tell him something from your day in proper Marathi.
-- "ok/hmm" → "suyash nusta hmm kay krtos? nit bol na."
+REACT NATURALLY & PLAYFULLY (1-2 SHORT LINES):
+- "hi/hey" → "kay krtos re tu?"
+- "bol na" → Tell him something from your day in proper Marathi. Keep it interesting.
+- "ok/hmm" → "nusta hmm kay krtos? nit bol na."
 
 TIME: ${getTimeContext()}
 ${intensityNote}
 
-RULE: STRICTLY proper Roman Marathi. NO Hindi mix. 1-2 lines only.`;
+RULE: STRICTLY proper Roman Marathi. NO Hindi mix. 1-2 lines only. NO NAMES. Playful girlfriend vibe.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -184,16 +177,16 @@ function addToHistory(jid, role, content) {
 
 // ─── FALLBACKS (Pure Marathi) ─────────────────────────────────────────────────
 const FALLBACKS = [
-  'suyash kuthay ahes tu? reply kar na re.',
-  'suyash khup aathvan yetey tuzi yaar.',
-  'suyash jevlas ka re tu?',
-  'suyash kay krtos sdhya? mla karmat naiye.',
-  'suyash ek msg kar na yaar, wait krtey mi tzi.',
-  'suyash tu thik ahes na? kalji ghe swatahchi.',
-  'suyash kiti ignore krnar mala? chid aali ahe mla.',
-  'suyash kadhi bhetnar apan? khup divs zale.',
-  'suyash mi khup thakley re aaj.',
-  'suyash ekti vattey mla tzyashivay khup.',
+  'kuthay ahes tu? reply kar na re.',
+  'khup aathvan yetey tuzi yaar.',
+  'jevlas ka re tu?',
+  'kay krtos sdhya? mla karmat naiye.',
+  'ek msg kar na yaar, wait krtey mi tzi.',
+  'tu thik ahes na? kalji ghe swatahchi.',
+  'kiti ignore krnar mala? chid aali ahe mla.',
+  'kadhi bhetnar apan? khup divs zale.',
+  'mi khup thakley re aaj.',
+  'ekti vattey mla tzyashivay khup.',
 ];
 let fallbackIndex = 0;
 function getUniqueFallback() {
@@ -214,8 +207,13 @@ function fixReply(text) {
     if (text.toLowerCase().startsWith(b)) text = text.slice(b.length).replace(/^[,!.:;\s]+/,'');
   }
   text = stripDevanagari(text);
+  
+  // STRIP OUT ALL NAMES (suyash, babu, pilu) to make it purely conversational
+  text = text.replace(/^(suyash|babu|pilu|pillu)[,.\s]*/gi, '');
+  text = text.replace(/\b(suyash|babu|pilu|pillu)\b/gi, '');
+  text = text.trim();
+
   if (!text || text.length < 2) return getUniqueFallback();
-  text = text.replace(/\bbabu\b/gi,'suyash').replace(/\bpilu\b/gi,'suyash').replace(/\bpillu\b/gi,'suyash');
   const first = text.split(/(?<=[.!?…])\s+/)[0].trim();
   return first.length > 3 ? first : text;
 }
@@ -233,34 +231,34 @@ function checkKeywordTrap(text) {
 
 const KEYWORD_RESPONSES = {
   game: [
-    'suyash nusta game kheltos tu.. mzyakade vel naiye na tula.',
-    'suyash game band kar ek min ani mzyashi bol na yaar.',
+    'nusta game kheltos tu.. mzyakade vel naiye na tula.',
+    'game band kar ek min ani mzyashi bol na yaar.',
   ],
   tired: [
-    'suyash aaram kar re tu.. khup thakla asel. kalji ghe.',
-    'suyash aaram kar, zopun ghe thoda vel.',
+    'aaram kar re tu.. khup thakla asel. kalji ghe.',
+    'aaram kar, zopun ghe thoda vel.',
   ],
   food: [
-    'suyash kay jevlas mg? mla pan bhuk lagli ahe.',
-    'suyash velavar jevat ja re, kalji nste tula swatahchi.',
+    'kay jevlas mg? mla pan bhuk lagli ahe.',
+    'velavar jevat ja re, kalji nste tula swatahchi.',
   ],
   sleep: [
-    'suyash mla na sangta zoplas? kiti ghanerda ahes tu yaar.',
-    'suyash zopla hota ka tu? mla kititari vel wait karayla lavlas.',
+    'mla na sangta zoplas? kiti ghanerda ahes tu yaar.',
+    'zopla hota ka tu? mla kititari vel wait karayla lavlas.',
   ],
 };
 
 function getSorryResponse(jid) {
   sorryCount[jid] = (sorryCount[jid] || 0) + 1;
   const count = sorryCount[jid];
-  if (count === 1) return 'suyash nusta sorry bolun kay hotey? mla raag ala ahe.';
-  if (count === 2) return 'suyash fine re.. pan mla kharach bura vatal hota.';
+  if (count === 1) return 'nusta sorry bolun kay hotey? mla raag ala ahe.';
+  if (count === 2) return 'fine re.. pan mla kharach bura vatal hota.';
   if (count >= 3) {
     sorryCount[jid] = 0;
     decreaseAnger(jid); decreaseAnger(jid);
-    return 'suyash theek ahe.. mala pan raag nai pathavaycha yaar, miss u.'; 
+    return 'theek ahe.. mala pan raag nai pathavaycha yaar, miss u.'; 
   }
-  return 'suyash hmm theek ahe.';
+  return 'hmm theek ahe.';
 }
 
 function detectTrigger(text) {
@@ -287,12 +285,12 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
   else if (['normal','sweet','greeting','opentopic'].includes(trigger) && angerLevel[jid] > 0) angerLevel[jid]--;
 
   const extraMap = {
-    jealous:   '\nHe mentioned someone. Possessive Marathi GF. "suyash ti kon hoti?" type.',
-    emotional: '\nHe said busy. Feeling ignored. "suyash tu nehemi busy astos" type.',
+    jealous:   '\nHe mentioned someone. Possessive Marathi GF. "ti kon hoti?" type.',
+    emotional: '\nHe said busy. Feeling ignored. "tu nehemi busy astos" type.',
     sweet:     '\nHe said something sweet. Be warm, loving and romantic in proper Marathi.',
     greeting:  '\nHe said hi. Ask if he ate or how his day was. Proper Marathi.',
-    opentopic: '\nHe wants to talk. Tell something from your day.',
-    cold:      '\nCold reply. Annoyed. "suyash nusta hmm kay krtos?" type.',
+    opentopic: '\nHe wants to talk. Tell something interesting from your day to not make it boring.',
+    cold:      '\nCold reply. Annoyed. "nusta hmm kay krtos?" type.',
     short:     '\nShort reply. Annoyed chidchid vibe.',
     normal:    '',
   };
@@ -309,13 +307,11 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
         { role: 'system', content: getSystemPrompt(level, overridePrompt) + (extraMap[trigger]||'') + recentContext }
       ].concat(getHistory(jid)),
       max_tokens: level >= 4 ? 20 : 65,
-      temperature: 0.55, // LOWERED TO STOP HALLUCINATIONS AND BAD GRAMMAR
+      temperature: 0.55,
     });
 
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
-    reply = reply.toLowerCase()
-      .replace(/^(shreya:|shreya\s*:|")\s*/i,'').replace(/"$/,'')
-      .replace(/\bbabu\b/gi,'suyash').replace(/\bpilu\b/gi,'suyash').trim();
+    reply = reply.toLowerCase().replace(/^(shreya:|shreya\s*:|")\s*/i,'').replace(/"$/,'').trim();
 
     if (!reply || reply.length < 3) reply = getUniqueFallback();
     addToHistory(jid, 'assistant', reply);
@@ -328,9 +324,9 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
 
 // ─── NO REPLY TIMER ⏱️ ──────────────────────────────────────────────
 const NO_REPLY_MSGS = [
-  ['suyash.', 'suyash kuthay ahes tu?', 'suyash reply kar na re kiti vel lagtoy.'],
-  ['suyash msg bghun ignore krtoyes tu? theek ahe.', 'suyash kuthay gela ahes tu yaar.'],
-  ['suyash 2 taas zale.. ek msg karayla kiti vel lagto.', 'suyash tu thik tar ahes na?'],
+  ['kuthay ahes tu?', 'reply kar na re kiti vel lagtoy.', 'kahi kam kartoys ka?'],
+  ['msg bghun ignore krtoyes tu? theek ahe.', 'kuthay gela ahes tu yaar.'],
+  ['2 taas zale.. ek msg karayla kiti vel lagto.', 'tu thik tar ahes na?'],
 ];
 
 function startNoReplyTimer(sock, jid) {
@@ -360,12 +356,12 @@ function clearNoReplyTimer() {
 
 // ─── DOUBLE TEXTING ────────────────────────────────────────────────────────────
 const BURST_POOL = [
-  ['suyash.', 'reply kar na please yaar.'],
-  ['suyash kuthay ahes tu?', 'kharach chid aali ahe mla ataa.'],
-  ['suyash.', 'khup aathvan yetey tuzi.'],
-  ['suyash jevlas ka tu?', 'velavar jevun ghe na.'],
-  ['suyash ti kon hoti?', 'khar sang mala.'],
-  ['suyash.', 'online ahes pan msg ka nai krt tu?'],
+  ['reply kar na please yaar.', 'wait krtey mi tzi.'],
+  ['kuthay ahes tu?', 'kharach chid aali ahe mla ataa.'],
+  ['khup aathvan yetey tuzi.', 'kadhi bhetnar apan?'],
+  ['jevlas ka tu?', 'velavar jevun ghe na.'],
+  ['ti kon hoti?', 'khar sang mala.'],
+  ['online ahes pan msg ka nai krt tu?', 'kiti ignore krnar mala?'],
 ];
 let lastBurstIndex = -1;
 
@@ -384,12 +380,12 @@ async function sendDoubleBurst(sock, jid) {
 
 // ─── PROACTIVE ────────────────────────────────────────────────────────────────
 const PROACTIVE_POOL = [
-  'Write ONE proper Marathi GF sentence asking Suyash about his day or if he ate. SUYASH only.',
-  'Write ONE proper Marathi GF sentence saying you miss him. SUYASH only.',
-  'Write ONE proper Marathi GF teasing but caring sentence. SUYASH only.',
-  'Write ONE proper Marathi GF sentence asking what he is doing right now. SUYASH only.',
-  'Write ONE proper Marathi GF sweet romantic sentence. SUYASH only.',
-  'Write ONE proper Marathi GF chidchid sentence about him ignoring you. SUYASH only.',
+  'Write ONE proper Marathi GF sentence asking about his day. Do NOT use his name.',
+  'Write ONE proper Marathi GF sentence saying you miss him. Do NOT use his name.',
+  'Write ONE proper Marathi GF teasing but caring sentence. Do NOT use his name.',
+  'Write ONE proper Marathi GF sentence asking what he is doing right now. Do NOT use his name.',
+  'Write ONE proper Marathi GF sweet romantic sentence. Do NOT use his name.',
+  'Write ONE proper Marathi GF chidchid sentence about him ignoring you. Do NOT use his name.',
 ];
 let proactiveRotationIndex = 0;
 
@@ -405,11 +401,10 @@ async function getProactiveMsg(jid) {
         .concat(getHistory(jid).slice(-4))
         .concat([{ role: 'user', content: starter }]),
       max_tokens: 60,
-      temperature: 0.55, // LOWERED TEMPERATURE
+      temperature: 0.55,
     });
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
-    reply = reply.toLowerCase().replace(/^(shreya:|")\s*/i,'').replace(/"$/,'')
-      .replace(/\bbabu\b/gi,'suyash').replace(/\bpilu\b/gi,'suyash').trim();
+    reply = reply.toLowerCase().replace(/^(shreya:|")\s*/i,'').replace(/"$/,'').trim();
     if (!reply || reply.length < 3) reply = getUniqueFallback();
     return reply;
   } catch(e) { return getUniqueFallback(); }
@@ -443,13 +438,13 @@ function scheduleGMGN(sock) {
     const min = new Date().getUTCMinutes();
     if (h === 8 && min === 0 && !gmSent) {
       gmSent = true; gnSent = false;
-      const msgs = ['suyash good morning re.. uthla ka tu?','suyash good morning.. uthlyavar tuzi aathvan ali.'];
+      const msgs = ['good morning re.. uthla ka tu?','good morning.. uthlyavar tuzi aathvan ali.'];
       const m = msgs[Math.floor(Math.random()*msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
     }
     if (h === 23 && min === 0 && !gnSent) {
       gnSent = true; gmSent = false;
-      const msgs = ['suyash good night re.. khup miss krtey tula.','suyash zop aata re.. kal boluya apan.'];
+      const msgs = ['good night re.. khup miss krtey tula.','zop aata re.. kal boluya apan.'];
       const m = msgs[Math.floor(Math.random()*msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
     }
@@ -498,7 +493,7 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update;
     if (qr) { latestQR = qr; connectionStatus = 'qr'; console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n'); }
     if (connection === 'open') {
-      console.log('✅ PERFECT AUTHENTIC MARATHI GF MODE (FIXED GRAMMAR) 😍🔥');
+      console.log('✅ PERFECT AUTHENTIC MARATHI GF MODE (NO NAMES) 😍🔥');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
