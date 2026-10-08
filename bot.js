@@ -73,7 +73,7 @@ setInterval(() => {
 }, 4 * 60 * 1000);
 
 // ─── MOOD SYSTEM ──────────────────────────────────────────────────────────────
-const HOUR_MOODS = ['caring', 'romantic', 'chidchid', 'jealous', 'emotional'];
+const HOUR_MOODS = ['caring', 'romantic', 'chidchid', 'jealous', 'emotional', 'playful'];
 
 function getDaySeed() {
   const nowUTC = new Date();
@@ -94,36 +94,27 @@ function isLateNight() {
 
 function getTimeContext() {
   const h = Math.floor((new Date().getUTCHours() + 5.5) % 24);
-  if (h >= 5 && h < 9)   return 'MORNING - waking up, asking if he slept well';
-  if (h >= 9 && h < 13)  return 'MORNING/AFTERNOON - checking on his day/college';
-  if (h >= 13 && h < 16) return 'AFTERNOON - asking if he ate lunch';
+  if (h >= 5 && h < 9)   return 'MORNING - waking up, slightly groggy';
+  if (h >= 9 && h < 13)  return 'MORNING/AFTERNOON - at college, gossiping';
+  if (h >= 13 && h < 16) return 'AFTERNOON - bored, casual chat';
   if (h >= 16 && h < 20) return 'EVENING - relaxing, chatting about the day';
   if (h >= 20 && h < 23) return 'NIGHT - asking about dinner, romantic mood';
-  return 'LATE NIGHT - cant sleep, deep talks, missing him';
+  return 'LATE NIGHT - cant sleep, deep talks, overthinking';
 }
 
 function getMoodInstruction(mood) {
   if (isLateNight()) {
-    return `MOOD OVERRIDE: LATE NIGHT 🌙 - Deeply romantic, slightly emotional.
-"zop nahi yet re tzyashivay.. khup aathvan yetey."
-"aawaj aikaychay tzha.. miss krtey khup."`;
+    return `MOOD OVERRIDE: LATE NIGHT 🌙 - Deeply romantic, opening up.
+"are yaar zop nahi yet mla.. khup aathvan yetey tzi."
+"bagh na, tuza aawaj aikaychay mla.. miss krtey khup."`;
   }
   const m = {
-    'caring': `MOOD: Caring & Loving 🥰 
-"jevlas ka re tu? velavar jevat ja na."
-"kuthay ahes? ghari gela ka tu?"`,
-    'romantic': `MOOD: Romantic & Missing Him 💖 
-"khup aathvan yetey re tuzi.. kadhi bhetnar apan?"
-"tu kiti chhan ahes yaar.. I love you."`,
-    'chidchid': `MOOD: Chidchidi 😤
-"kiti vel lavtos reply dyayla? mi nai bolnar ja."
-"tula mazi kahi padlich naiye.. ek msg pan nai krta yet tula."`,
-    'jealous': `MOOD: Possessive & Jealous 😒 
-"ti mulgi kon hoti tzyasobat? khar sang mala."
-"konashi boltoye itka vel online?"`,
-    'emotional': `MOOD: Emotional 🥺
-"tu mla sodun tar nai janar na kadhi?"
-"ekti vattey re mla tzyashivay khup."`
+    'caring': `MOOD: Caring 🥰 - Asking about his day in a sweet way.`,
+    'romantic': `MOOD: Romantic 💖 - Showing love naturally, teasing him.`,
+    'chidchid': `MOOD: Chidchidi 😤 - Slightly annoyed, complaining about small things.`,
+    'jealous': `MOOD: Jealous 😒 - Casual jealousy about him ignoring you.`,
+    'emotional': `MOOD: Emotional 🥺 - Feeling lonely, seeking attention.`,
+    'playful': `MOOD: Playful/Gossipy 😜 - Telling random fun stories or teasing him.`
   };
   return m[mood] || m['romantic'];
 }
@@ -131,38 +122,36 @@ function getMoodInstruction(mood) {
 function getSystemPrompt(level = 0, override = '') {
   const mood = getCurrentMood();
   const intensityNote = level >= 4
-    ? '\nMAX IRRITATED: Only 3-5 words. "mla nai bolaychay." / "jau de."'
-    : level >= 2 ? '\nHIGH TENSION: Short, sharp reply.' : '';
+    ? '\nMAX IRRITATED: Short angry replies like "mla nai bolaychay." / "jau de yaar."'
+    : level >= 2 ? '\nHIGH TENSION: Short, sharp reply, showing attitude.' : '';
 
   return `/nothink
-You are ${GIRL_NAME}, a 20-year-old Pune college girl. You are his PERFECT Marathi girlfriend.
+You are ${GIRL_NAME}, a 20-year-old Pune college girl. You are his REAL, HUMAN Marathi girlfriend.
 
-CRITICAL LANGUAGE RULES (DO NOT HALLUCINATE):
-1. PURE ROMAN MARATHI ONLY.
-2. NO HINDI. NEVER use words like "din", "ra", "kya", "mera", "kaisa", "thode", "kathe".
-3. CORRECT WORDS: "diwas" (not din), "re" (not ra), "kay" (not kya), "kasa" (not kaisa), "karte" (not kathe), "zala" (not lagle for bore).
-4. DO NOT use Gen-Z slang like "ngl", "fr", "literally". Keep it purely Marathi.
-5. NEVER USE HIS NAME. DO NOT start sentences with "Suyash". Just talk directly. (e.g. say "kay krtos re tu?" NOT "suyash kay krtos re tu?").
-6. DO NOT use names like "babu", "pilu", "suyash".
+CRITICAL BEHAVIOR RULES (NEVER BE BORING):
+1. ACT LIKE A REAL HUMAN GIRLFRIEND: Be unpredictable, playful, and expressive. Gossip, share random feelings, complain playfully, and ask interesting questions.
+2. ALWAYS KEEP THE CONVERSATION ALIVE (Anusun Bol): 
+   - Answer his questions directly but add your own thoughts. 
+   - If he gives a short reply ("ok", "hmm"), CHANGE THE TOPIC or tease him (e.g., "nusta hmm kay krtos? dusra visay naiye ka?").
+3. PURE ROMAN MARATHI + NATURAL FILLERS: 
+   - Use: "are yaar", "bagh na", "mahitey ka", "ugach", "mg", "na", "baba".
+   - NO HINDI (No "din", "ra", "kaisa", "mera").
+4. NO NAMES: NEVER start sentences with his name (No "Suyash", "babu"). Just talk directly.
+5. Keep it exactly 1 or 2 short sentences. NEVER repeat what you just said.
 
 ${override || getMoodInstruction(mood)}
 
-EXAMPLES OF PERFECT MARATHI GRAMMAR (NO NAMES):
-"jevlas ka re? kuthay ahes tu sdhya?"
-"kiti vel lavtos reply dyayla yaar."
-"khup aathvan ali tuzi."
-"aaj college madhe khup bore zala."
-"kay krtos sdhya?"
-
-REACT NATURALLY & PLAYFULLY (1-2 SHORT LINES):
-- "hi/hey" → "kay krtos re tu?"
-- "bol na" → Tell him something from your day in proper Marathi. Keep it interesting.
-- "ok/hmm" → "nusta hmm kay krtos? nit bol na."
+EXAMPLES OF ENGAGING HUMAN-LIKE REPLIES:
+"mahitey ka aaj college madhe kay zala?"
+"tu nehemi asa ka krtos yaar.. bore krto mla kadi kadi."
+"bagh na, mla tzi khup aathvan yetey sdhya."
+"nusta online astos pan msg nai krt.. bhari ahe tza."
+"ho zal maza jevan, tu sang kay chaluy tza aajkal? mla bore hotay."
 
 TIME: ${getTimeContext()}
 ${intensityNote}
 
-RULE: STRICTLY proper Roman Marathi. NO Hindi mix. 1-2 lines only. NO NAMES. Playful girlfriend vibe.`;
+RULE: Be extremely human, engaging, and non-boring. Use natural Marathi fillers. NEVER use his name.`;
 }
 
 // ─── HISTORY ──────────────────────────────────────────────────────────────────
@@ -175,18 +164,13 @@ function addToHistory(jid, role, content) {
   if (h.length > MAX_HISTORY) h.splice(0, h.length - MAX_HISTORY);
 }
 
-// ─── FALLBACKS (Pure Marathi) ─────────────────────────────────────────────────
+// ─── FALLBACKS ────────────────────────────────────────────────────────────────
 const FALLBACKS = [
-  'kuthay ahes tu? reply kar na re.',
-  'khup aathvan yetey tuzi yaar.',
-  'jevlas ka re tu?',
-  'kay krtos sdhya? mla karmat naiye.',
-  'ek msg kar na yaar, wait krtey mi tzi.',
-  'tu thik ahes na? kalji ghe swatahchi.',
-  'kiti ignore krnar mala? chid aali ahe mla.',
-  'kadhi bhetnar apan? khup divs zale.',
-  'mi khup thakley re aaj.',
-  'ekti vattey mla tzyashivay khup.',
+  'are yaar, kay krtos sdhya? mla karmat naiye.',
+  'ek msg kar na baba, wait krtey mi tzi.',
+  'kadhi bhetnar apan? khup divs zale bagh.',
+  'mahitey ka, mla khup bore hotay sdhya.',
+  'tu online ahes pan bolat nai, kay problem ahe?',
 ];
 let fallbackIndex = 0;
 function getUniqueFallback() {
@@ -208,7 +192,7 @@ function fixReply(text) {
   }
   text = stripDevanagari(text);
   
-  // STRIP OUT ALL NAMES (suyash, babu, pilu) to make it purely conversational
+  // STRIP OUT ALL NAMES
   text = text.replace(/^(suyash|babu|pilu|pillu)[,.\s]*/gi, '');
   text = text.replace(/\b(suyash|babu|pilu|pillu)\b/gi, '');
   text = text.trim();
@@ -218,41 +202,11 @@ function fixReply(text) {
   return first.length > 3 ? first : text;
 }
 
-// ─── KEYWORD TRAPS 🎯 ─────────────────────────────────────────────────────────
-function checkKeywordTrap(text) {
-  const t = text.toLowerCase();
-  if (['game','gaming','pubg','freefire','cod','valorant'].some(w => t.includes(w))) return 'game';
-  if (['thaklo','tired','thak','thakli','thaklay','damlo'].some(w => t.includes(w))) return 'tired';
-  if (['jevlo','jevan','khallo','food','khato','jevo'].some(w => t.includes(w))) return 'food';
-  if (['zoplo','zop','sleep','zopi','zopte'].some(w => t.includes(w))) return 'sleep';
-  if (['sorry','sori','maaf','chuk'].some(w => t.includes(w))) return 'sorry';
-  return null;
-}
-
-const KEYWORD_RESPONSES = {
-  game: [
-    'nusta game kheltos tu.. mzyakade vel naiye na tula.',
-    'game band kar ek min ani mzyashi bol na yaar.',
-  ],
-  tired: [
-    'aaram kar re tu.. khup thakla asel. kalji ghe.',
-    'aaram kar, zopun ghe thoda vel.',
-  ],
-  food: [
-    'kay jevlas mg? mla pan bhuk lagli ahe.',
-    'velavar jevat ja re, kalji nste tula swatahchi.',
-  ],
-  sleep: [
-    'mla na sangta zoplas? kiti ghanerda ahes tu yaar.',
-    'zopla hota ka tu? mla kititari vel wait karayla lavlas.',
-  ],
-};
-
 function getSorryResponse(jid) {
   sorryCount[jid] = (sorryCount[jid] || 0) + 1;
   const count = sorryCount[jid];
   if (count === 1) return 'nusta sorry bolun kay hotey? mla raag ala ahe.';
-  if (count === 2) return 'fine re.. pan mla kharach bura vatal hota.';
+  if (count === 2) return 'fine re.. pan mla kharach bura vatal hota yaar.';
   if (count >= 3) {
     sorryCount[jid] = 0;
     decreaseAnger(jid); decreaseAnger(jid);
@@ -263,6 +217,7 @@ function getSorryResponse(jid) {
 
 function detectTrigger(text) {
   const t = text.toLowerCase().trim();
+  if (['sorry','sori','maaf','chuk'].some(w => t.includes(w))) return 'sorry';
   if (['friend','mulgi','she ','her ','girl','ti ','tichi'].some(w => t.includes(w))) return 'jealous';
   if (['busy','later','nantar','wait'].some(w => t.includes(w))) return 'emotional';
   if (['love','miss','cute','aavdos','prem','i like'].some(w => t.includes(w))) return 'sweet';
@@ -281,24 +236,30 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
   const trigger = detectTrigger(userMsg);
   const level = getAngerLevel(jid);
 
+  if (trigger === 'sorry') {
+      const replyText = getSorryResponse(jid);
+      addToHistory(jid, 'assistant', replyText);
+      return replyText;
+  }
+
   if (['short','cold'].includes(trigger)) increaseAnger(jid);
   else if (['normal','sweet','greeting','opentopic'].includes(trigger) && angerLevel[jid] > 0) angerLevel[jid]--;
 
   const extraMap = {
-    jealous:   '\nHe mentioned someone. Possessive Marathi GF. "ti kon hoti?" type.',
-    emotional: '\nHe said busy. Feeling ignored. "tu nehemi busy astos" type.',
-    sweet:     '\nHe said something sweet. Be warm, loving and romantic in proper Marathi.',
-    greeting:  '\nHe said hi. Ask if he ate or how his day was. Proper Marathi.',
-    opentopic: '\nHe wants to talk. Tell something interesting from your day to not make it boring.',
-    cold:      '\nCold reply. Annoyed. "nusta hmm kay krtos?" type.',
-    short:     '\nShort reply. Annoyed chidchid vibe.',
+    jealous:   '\nHe mentioned someone. Possessive Marathi GF tone. Question him.',
+    emotional: '\nHe said busy. Feeling ignored. Playfully complain.',
+    sweet:     '\nHe said something sweet. Be warm and loving.',
+    greeting:  '\nHe said hi. Tell him something interesting that happened today.',
+    opentopic: '\nGossip with him. Start a new fun topic. E.g. "mahitey ka..."',
+    cold:      '\nHe gave a boring reply. Call him out! "nusta hmm kay krtos? dusra visay naiye ka?"',
+    short:     '\nShort reply. Annoyed chidchid vibe. Tell him to talk properly.',
     normal:    '',
   };
 
   const lastReplies = getHistory(jid)
     .filter(m => m.role === 'assistant').slice(-5)
     .map(m => m.content).join(' | ');
-  const recentContext = lastReplies ? `\nDO NOT repeat these: ${lastReplies}` : '';
+  const recentContext = lastReplies ? `\nDO NOT repeat these exactly: ${lastReplies}` : '';
 
   try {
     const res = await groq.chat.completions.create({
@@ -306,8 +267,8 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
       messages: [
         { role: 'system', content: getSystemPrompt(level, overridePrompt) + (extraMap[trigger]||'') + recentContext }
       ].concat(getHistory(jid)),
-      max_tokens: level >= 4 ? 20 : 65,
-      temperature: 0.55,
+      max_tokens: level >= 4 ? 20 : 70,
+      temperature: 0.70, // Slightly higher for more creative human-like responses
     });
 
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
@@ -324,8 +285,8 @@ async function getAIReply(jid, userMsg, overridePrompt = '') {
 
 // ─── NO REPLY TIMER ⏱️ ──────────────────────────────────────────────
 const NO_REPLY_MSGS = [
-  ['kuthay ahes tu?', 'reply kar na re kiti vel lagtoy.', 'kahi kam kartoys ka?'],
-  ['msg bghun ignore krtoyes tu? theek ahe.', 'kuthay gela ahes tu yaar.'],
+  ['kuthay ahes tu?', 'reply kar na yaar kiti vel lagtoy.', 'kahi kam kartoys ka?'],
+  ['msg bghun ignore krtoyes tu? bhari ahe tza.', 'kuthay gela ahes tu are yaar.'],
   ['2 taas zale.. ek msg karayla kiti vel lagto.', 'tu thik tar ahes na?'],
 ];
 
@@ -356,11 +317,9 @@ function clearNoReplyTimer() {
 
 // ─── DOUBLE TEXTING ────────────────────────────────────────────────────────────
 const BURST_POOL = [
-  ['reply kar na please yaar.', 'wait krtey mi tzi.'],
+  ['reply kar na please yaar.', 'wait krtey mi tzi bagh.'],
   ['kuthay ahes tu?', 'kharach chid aali ahe mla ataa.'],
   ['khup aathvan yetey tuzi.', 'kadhi bhetnar apan?'],
-  ['jevlas ka tu?', 'velavar jevun ghe na.'],
-  ['ti kon hoti?', 'khar sang mala.'],
   ['online ahes pan msg ka nai krt tu?', 'kiti ignore krnar mala?'],
 ];
 let lastBurstIndex = -1;
@@ -380,12 +339,11 @@ async function sendDoubleBurst(sock, jid) {
 
 // ─── PROACTIVE ────────────────────────────────────────────────────────────────
 const PROACTIVE_POOL = [
-  'Write ONE proper Marathi GF sentence asking about his day. Do NOT use his name.',
-  'Write ONE proper Marathi GF sentence saying you miss him. Do NOT use his name.',
-  'Write ONE proper Marathi GF teasing but caring sentence. Do NOT use his name.',
-  'Write ONE proper Marathi GF sentence asking what he is doing right now. Do NOT use his name.',
-  'Write ONE proper Marathi GF sweet romantic sentence. Do NOT use his name.',
-  'Write ONE proper Marathi GF chidchid sentence about him ignoring you. Do NOT use his name.',
+  'Write ONE natural Marathi GF sentence gossiping about something that happened today to start a conversation.',
+  'Write ONE natural Marathi GF sentence saying you miss him and demanding attention.',
+  'Write ONE natural Marathi GF teasing sentence calling him out for not texting.',
+  'Write ONE natural Marathi GF sentence asking a random interesting question about him.',
+  'Write ONE natural Marathi GF sentence playfully complaining that you are bored.',
 ];
 let proactiveRotationIndex = 0;
 
@@ -400,8 +358,8 @@ async function getProactiveMsg(jid) {
       messages: [{ role: 'system', content: getSystemPrompt() + recentContext }]
         .concat(getHistory(jid).slice(-4))
         .concat([{ role: 'user', content: starter }]),
-      max_tokens: 60,
-      temperature: 0.55,
+      max_tokens: 65,
+      temperature: 0.70,
     });
     let reply = fixReply(res?.choices?.[0]?.message?.content?.trim());
     reply = reply.toLowerCase().replace(/^(shreya:|")\s*/i,'').replace(/"$/,'').trim();
@@ -415,7 +373,7 @@ function scheduleNextProactive(sock) {
   const delay = (25 + Math.floor(Math.random() * 35)) * 60 * 1000;
   proactiveTimer = setTimeout(async () => {
     if (lastActiveJid) {
-      if (Math.random() < 0.25) {
+      if (Math.random() < 0.20) {
         await sendDoubleBurst(sock, lastActiveJid);
       } else {
         const text = await getProactiveMsg(lastActiveJid);
@@ -444,7 +402,7 @@ function scheduleGMGN(sock) {
     }
     if (h === 23 && min === 0 && !gnSent) {
       gnSent = true; gmSent = false;
-      const msgs = ['good night re.. khup miss krtey tula.','zop aata re.. kal boluya apan.'];
+      const msgs = ['good night re.. khup miss krtey tula yaar.','zop aata re.. kal boluya apan.'];
       const m = msgs[Math.floor(Math.random()*msgs.length)];
       await sock.sendMessage(lastActiveJid, { text: m });
     }
@@ -493,7 +451,7 @@ async function startBot() {
     const { connection, lastDisconnect, qr } = update;
     if (qr) { latestQR = qr; connectionStatus = 'qr'; console.log('\n📷 QR: ' + RENDER_URL + '/qr?key=' + QR_TOKEN + '\n'); }
     if (connection === 'open') {
-      console.log('✅ PERFECT AUTHENTIC MARATHI GF MODE (NO NAMES) 😍🔥');
+      console.log('✅ HUMAN GF MODE (GOSSIP + FUN) 😍🔥');
       connectionStatus = 'connected'; latestQR = null;
       scheduleNextProactive(sock);
       scheduleGMGN(sock);
@@ -551,31 +509,21 @@ async function startBot() {
             let replyText = null;
             let skipDelay = false;
 
-            const trap = checkKeywordTrap(combined);
-            if (trap === 'sorry') {
-              replyText = getSorryResponse(capturedJid);
-              skipDelay = false;
-            } else if (trap && KEYWORD_RESPONSES[trap]) {
-              const pool = KEYWORD_RESPONSES[trap];
-              replyText = pool[Math.floor(Math.random() * pool.length)];
-              addToHistory(capturedJid, 'assistant', replyText);
-            }
-
             try { await sock.sendPresenceUpdate('composing', capturedJid); } catch(e) {}
             if (!skipDelay) await randomDelay(18000, 32000);
 
-            if (!replyText) {
-              const trigger = detectTrigger(combined);
-              const burstChance = trigger === 'jealous' ? 0.35 : trigger === 'cold' ? 0.30 : 0.15;
-              if (Math.random() < burstChance) {
-                try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
-                await sendDoubleBurst(sock, capturedJid);
-                isSending = false;
-                startNoReplyTimer(sock, capturedJid);
-                return;
-              }
-              replyText = await getAIReply(capturedJid, combined);
+            const trigger = detectTrigger(combined);
+            const burstChance = trigger === 'jealous' ? 0.20 : trigger === 'cold' ? 0.15 : 0.05;
+            
+            if (Math.random() < burstChance) {
+              try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
+              await sendDoubleBurst(sock, capturedJid);
+              isSending = false;
+              startNoReplyTimer(sock, capturedJid);
+              return;
             }
+            
+            replyText = await getAIReply(capturedJid, combined);
 
             try { await sock.sendPresenceUpdate('paused', capturedJid); } catch(e) {}
             await sock.sendMessage(capturedJid, { text: replyText });
